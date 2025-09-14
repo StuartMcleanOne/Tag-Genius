@@ -1,0 +1,24 @@
+
+Essential =
+            "primary_genre": 1 x tag,
+            "sub_genre": 1 x tag,
+            "energy_vibe": 1 x tag,
+            "situation_environment": 1 x tag,
+            "components": 2 x tag,
+            "time_period": 1 x tag
+
+Recommended =
+            "primary_genre": 1 x tag,
+            "sub_genre": 2 x tag,
+            "energy_vibe": 2 x tag,
+            "situation_environment": 2 x tag,
+            "components": 3 x tag,
+            "time_period": 1 x tag
+
+Detailed =
+            "primary_genre": 1 x tag,
+            "sub_genre":  2 < 4 x tag,
+            "energy_vibe": 2 < 4 x tag,
+            "situation_environment": 2 < 4 x tag,
+            "components": 2 < 4 x tag,
+            "time_period": 1 x tag
