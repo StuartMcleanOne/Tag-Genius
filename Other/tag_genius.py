@@ -278,7 +278,7 @@ def upload_library():
         return jsonify({"error": "Invalid configuration format"}), 400
 
     if file:
-        file_path = os.path.join("uploads", file.filename)
+        file_path = os.path.join("Other", file.filename)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         file.save(file_path)
 

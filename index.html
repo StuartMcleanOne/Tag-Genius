@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tag Genius</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .drag-area {
+            border: 2px dashed #9ca3af;
+            border-radius: 1rem;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+        .drag-area.active {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 5px;
+            outline: none;
+            transition: opacity .2s;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #1d4ed8;
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid #fff;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #1d4ed8;
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid #fff;
+        }
+        .tooltip-text {
+            visibility: hidden;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 10px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            white-space: nowrap;
+        }
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-lg space-y-6">
+        <div class="text-center">
+            <h1 class="text-3xl font-bold text-gray-900">Tag Genius</h1>
+            <p class="text-gray-500 mt-2">
+                Upload your Rekordbox XML to get started.
+            </p>
+        </div>
+
+        <!-- Tagging Level Selector -->
+        <div class="space-y-4">
+            <label for="tagging-level" class="block text-sm font-medium text-gray-700">Tagging Detail Level</label>
+            <div class="relative w-full">
+                <input type="range" id="tagging-level" min="0" max="2" value="0" class="w-full">
+                <div class="flex justify-between text-xs text-gray-500 mt-2">
+                    <div class="tooltip relative">
+                        <span>Essential</span>
+                        <span class="tooltip-text">Receive only the core tags like primary genre and overall vibe.</span>
+                    </div>
+                    <div class="tooltip relative">
+                        <span>Recommended</span>
+                        <span class="tooltip-text">Receive a balanced set of tags, including a few key sub-genres and moods.</span>
+                    </div>
+                    <div class="tooltip relative">
+                        <span>Detailed</span>
+                        <span class="tooltip-text">Generate a comprehensive list of tags, including multiple sub-genres, moods, and key components.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- File Upload Area -->
+        <div id="drag-area" class="drag-area border-2 border-gray-300 rounded-lg p-8 text-center cursor-pointer transition-colors duration-200">
+            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                <path d="M28 8H12a2 2 0 00-2 2v20m30-20L28 8m0 0l4 4m-4-4V24m-12 8a2 2 0 01-2-2V8a2 2 0 012-2h12.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V28a2 2 0 01-2 2h-2m-3 8a2 2 0 002 2h4a2 2 0 002-2v-4m-6 4a2 2 0 01-2-2v-4a2 2 0 012-2h4a2 2 0 012 2v4a2 2 0 01-2 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+            <p class="mt-2 text-sm text-gray-600">Drag & drop your XML file here</p>
+            <p class="text-xs text-gray-500 mt-1">or click to browse</p>
+            <input type="file" id="file-input" class="hidden" accept=".xml">
+        </div>
+
+        <div id="status-message" class="text-center text-sm font-medium mt-4"></div>
+
+        <div class="flex justify-center space-x-4 mt-6">
+            <button id="start-tagging-btn" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-full shadow-md hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                Start Tagging
+            </button>
+            <button id="export-btn" class="px-6 py-3 bg-gray-500 text-white font-semibold rounded-full shadow-md hover:bg-gray-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50 hidden">
+                Export XML
+            </button>
+            <button id="clear-tags-btn" class="px-6 py-3 bg-red-500 text-white font-semibold rounded-full shadow-md hover:bg-red-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-50 hidden">
+                Clear Tags
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const dragArea = document.getElementById('drag-area');
+        const fileInput = document.getElementById('file-input');
+        const startTaggingBtn = document.getElementById('start-tagging-btn');
+        const exportBtn = document.getElementById('export-btn');
+        const clearTagsBtn = document.getElementById('clear-tags-btn');
+        const statusMessage = document.getElementById('status-message');
+        const taggingLevelInput = document.getElementById('tagging-level');
+        let uploadedFile = null;
+
+        // --- Tagging Configurations ---
+        const tagConfigurations = {
+            "0": {
+                "level": "Essential",
+                "primary_genre": 1,
+                "sub_genre": 1,
+                "energy_vibe": 1,
+                "situation_environment": 1,
+                "components": 1,
+                "time_period": 1
+            },
+            "1": {
+                "level": "Recommended",
+                "primary_genre": 1,
+                "sub_genre": 2,
+                "energy_vibe": 3,
+                "situation_environment": 2,
+                "components": 3,
+                "time_period": 1
+            },
+            "2": {
+                "level": "Detailed",
+                "primary_genre": 1,
+                "sub_genre": 4,
+                "energy_vibe": 5,
+                "situation_environment": 4,
+                "components": 4,
+                "time_period": 1
+            }
+        };
+
+        // --- Event Listeners for File Drag & Drop ---
+        dragArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dragArea.classList.add('active');
+        });
+
+        dragArea.addEventListener('dragleave', () => {
+            dragArea.classList.remove('active');
+        });
+
+        dragArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragArea.classList.remove('active');
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        dragArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFile(e.target.files[0]);
+        });
+
+        function handleFile(file) {
+            uploadedFile = file;
+            if (uploadedFile) {
+                statusMessage.textContent = `File selected: ${uploadedFile.name}`;
+                startTaggingBtn.disabled = false;
+                startTaggingBtn.classList.remove('disabled:opacity-50', 'disabled:cursor-not-allowed');
+            }
+        }
+
+        // --- Start Tagging Button Logic ---
+        startTaggingBtn.disabled = true;
+        startTaggingBtn.addEventListener('click', async () => {
+            if (!uploadedFile) {
+                return;
+            }
+
+            statusMessage.textContent = "Processing library, please wait...";
+            startTaggingBtn.disabled = true;
+
+            const selectedLevel = taggingLevelInput.value;
+            const config = tagConfigurations[selectedLevel];
+
+            const formData = new FormData();
+            formData.append('file', uploadedFile);
+            formData.append('config', JSON.stringify(config));
+
+            try {
+                // The URL is changed to point to the correct port.
+                const response = await fetch('http://127.0.0.1:5001/upload_library', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    statusMessage.textContent = result.message;
+                    exportBtn.classList.remove('hidden');
+                    clearTagsBtn.classList.remove('hidden');
+                } else {
+                    statusMessage.textContent = `Failed to process: ${result.error}`;
+                }
+            } catch (error) {
+                statusMessage.textContent = `Failed to upload: ${error.message}. Check your backend server.`;
+            } finally {
+                startTaggingBtn.disabled = false;
+            }
+        });
+
+        // --- Export & Clear Buttons Logic ---
+        exportBtn.addEventListener('click', async () => {
+            statusMessage.textContent = "Exporting file...";
+            try {
+                const response = await fetch('http://127.0.0.1:5001/export_xml');
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'tagged_library.xml';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    statusMessage.textContent = "File exported successfully!";
+                } else {
+                    const result = await response.json();
+                    statusMessage.textContent = `Failed to export: ${result.error}`;
+                }
+            } catch (error) {
+                statusMessage.textContent = `Failed to export: ${error.message}`;
+            }
+        });
+
+        clearTagsBtn.addEventListener('click', async () => {
+            statusMessage.textContent = "Clearing tags...";
+            try {
+                const response = await fetch('http://127.0.0.1:5001/clear_tags', {
+                    method: 'PUT',
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    statusMessage.textContent = result.message;
+                    exportBtn.classList.add('hidden');
+                    clearTagsBtn.classList.add('hidden');
+                } else {
+                    statusMessage.textContent = `Failed to clear tags: ${result.error}`;
+                }
+            } catch (error) {
+                statusMessage.textContent = `Failed to clear tags: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>
