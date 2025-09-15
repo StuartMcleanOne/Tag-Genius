@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 import json
 import requests
 import time
-from flask import Flask, jsonify, request, send_file # ADDED: send_file
+from flask import Flask, jsonify, request, send_file
 from dotenv import load_dotenv
 from flask_cors import CORS
 
@@ -13,29 +13,54 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# ADDED: A global variable to store the path of the last generated file
 LATEST_XML_PATH = None
 
-# --- Database Functions (Unchanged) ---
+
+# --- (All code from the start down to process_library is unchanged) ---
 def get_db_connection():
     conn = sqlite3.connect('tag_genius.db')
     conn.row_factory = sqlite3.Row
     return conn
+
 
 @app.cli.command('init-db')
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS tracks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, artist TEXT,
-            bpm REAL, track_key TEXT, genre TEXT, label TEXT, comments TEXT,
-            grouping TEXT, tags TEXT
-        );
-    """)
+                   CREATE TABLE IF NOT EXISTS tracks
+                   (
+                       id
+                       INTEGER
+                       PRIMARY
+                       KEY
+                       AUTOINCREMENT,
+                       name
+                       TEXT
+                       NOT
+                       NULL,
+                       artist
+                       TEXT,
+                       bpm
+                       REAL,
+                       track_key
+                       TEXT,
+                       genre
+                       TEXT,
+                       label
+                       TEXT,
+                       comments
+                       TEXT,
+                       grouping
+                       TEXT,
+                       tags
+                       TEXT
+                   );
+                   """)
     conn.commit()
     conn.close()
     print('Database initialized successfully.')
+
 
 def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grouping, tags):
     conn = get_db_connection()
@@ -43,27 +68,25 @@ def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grou
     try:
         cursor.execute("SELECT id FROM tracks WHERE name = ? AND artist = ?", (name, artist))
         if cursor.fetchone():
-            print(f"Skipping duplicate track: {name} by {artist}")
+            # print(f"Skipping duplicate track: {name} by {artist}")
             return
         cursor.execute(
             "INSERT INTO tracks (name, artist, bpm, track_key, genre, label, comments, grouping, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (name, artist, bpm, track_key, genre, label, comments, grouping, tags)
         )
         conn.commit()
-        # Quieter success message for cleaner logs
-        # print(f"Successfully inserted: {name} by {artist}")
     except sqlite3.Error as e:
         conn.rollback()
         print(f"Database error: {e}")
     finally:
         conn.close()
 
-# --- External API Functions ---
+
 def call_lexicon_api(artist, name):
     api_url = 'http://localhost:48624/v1/search/tracks'
     try:
         params = {"filter": {"artist": artist, "title": name}}
-        response = requests.get(api_url, json=params)
+        response = requests.get(api_url, json=params, timeout=10)
         response.raise_for_status()
         tracks = response.json().get('tracks', [])
         return tracks[0] if tracks else {}
@@ -123,12 +146,10 @@ def call_llm_for_tags(track_data, config):
         except json.JSONDecodeError as e:
             print(f"Failed to parse JSON from LLM response: {e}")
             return {}
-
     print(f"Max retries exceeded for track: {track_data.get('ARTIST')} - {track_data.get('TITLE')}")
     return {}
 
 
-# --- Flask Routes ---
 @app.route('/')
 def hello_ai(): return 'Hello, Ai!'
 
@@ -148,8 +169,7 @@ def upload_library():
         return jsonify({"error": "Invalid config format"}), 400
 
     if file:
-        upload_folder = "uploads"
-        output_folder = "outputs"
+        upload_folder, output_folder = "uploads", "outputs"
         os.makedirs(upload_folder, exist_ok=True)
         os.makedirs(output_folder, exist_ok=True)
 
@@ -157,89 +177,83 @@ def upload_library():
         output_path = os.path.join(output_folder, f"tagged_{file.filename}")
 
         file.save(input_path)
-
         result = process_library(input_path, output_path, config)
 
-        if "error" not in result:
-            LATEST_XML_PATH = output_path  # Save the path for the export button
-
+        if "error" not in result: LATEST_XML_PATH = output_path
         return jsonify(result), 200
 
     return jsonify({"error": "Unknown error"}), 500
 
 
-# MODIFIED: This is now the main event, writing the XML file
+# MODIFIED: Tag formatting logic is now more robust
 def process_library(input_path, output_path, config):
     try:
         tree = ET.parse(input_path)
         root = tree.getroot()
         tracks = root.find('COLLECTION').findall('TRACK')
         total_tracks = len(tracks)
-        print(f"Found {total_tracks} tracks in the XML file. Starting processing...")
+        print(f"Found {total_tracks} tracks. Starting processing...")
 
         for index, track in enumerate(tracks):
             track_name = track.get('Name')
             artist = track.get('Artist')
-
             print(f"\nProcessing track {index + 1}/{total_tracks}: {artist} - {track_name}")
 
-            # 1. Get enriched data
             lexicon_data = call_lexicon_api(artist, track_name)
             track_data = {
                 'ARTIST': artist, 'TITLE': track_name, 'GENRE': track.get('Genre'),
                 'YEAR': track.get('Year'), 'lexicon_data': lexicon_data
             }
 
-            # 2. Get AI tags
             generated_tags = call_llm_for_tags(track_data, config)
             if not generated_tags:
                 print("Skipping tag update due to empty AI response.")
                 continue
 
-            # 3. Format tags for Rekordbox
-            primary_genre = generated_tags.get('primary_genre', [])
-            sub_genre = generated_tags.get('sub_genre', [])
+            # This helper function ensures a value is a list
+            def ensure_list(value):
+                if isinstance(value, str): return [value]
+                if isinstance(value, list): return value
+                return []
+
+            # Use the helper to guarantee we are working with lists
+            primary_genre = ensure_list(generated_tags.get('primary_genre'))
+            sub_genre = ensure_list(generated_tags.get('sub_genre'))
             new_genre_string = ", ".join(primary_genre + sub_genre)
 
-            other_tags = [
-                *generated_tags.get('energy_vibe', []),
-                *generated_tags.get('situation_environment', []),
-                *generated_tags.get('components', []),
-                *generated_tags.get('time_period', [])
+            other_tags_lists = [
+                ensure_list(generated_tags.get('energy_vibe')),
+                ensure_list(generated_tags.get('situation_environment')),
+                ensure_list(generated_tags.get('components')),
+                ensure_list(generated_tags.get('time_period'))
             ]
 
-            # Create the Rekordbox-formatted comment block
-            new_comment_block = f"/* {' / '.join(tag for tag in other_tags if tag)} */"
+            # Flatten the list of lists into a single list of tags
+            flat_other_tags = [tag for sublist in other_tags_lists for tag in sublist]
 
+            new_comment_block = f"/* {' / '.join(tag for tag in flat_other_tags if tag)} */"
             original_comments = track.get('Comments', "")
-
-            # Non-destructively append our block
             final_comments = f"{original_comments} {new_comment_block}".strip()
 
-            # 4. Modify the XML element in memory
             track.set('Genre', new_genre_string)
             track.set('Comments', final_comments)
             print(f"Updated XML for: {track_name}")
 
-            # 5. (Optional) Save to DB for the API
             insert_track_data(
                 track_name, artist, track.get('AverageBpm'), track.get('Tonality'),
                 new_genre_string, track.get('Label'), final_comments, track.get('Grouping'),
                 json.dumps(generated_tags)
             )
 
-        # 6. Save the entire modified XML tree to the new file
         tree.write(output_path, encoding='UTF-8', xml_declaration=True)
-
         print(f"\nProcessing complete! New file saved at: {output_path}")
-        return {"message": f"Success! Your new library file is ready.", "filePath": output_path}
+        return {"message": "Success! Your new library file is ready.", "filePath": output_path}
 
     except Exception as e:
         print(f"An error occurred during processing: {e}")
         return {"error": f"Failed to process XML: {e}"}
 
 
-# MODIFIED: The export route is now functional
 @app.route('/export_xml', methods=['GET'])
 def export_xml():
     global LATEST_XML_PATH
@@ -249,9 +263,6 @@ def export_xml():
         except Exception as e:
             return jsonify({"error": str(e)}), 500
     return jsonify({"error": "No file available to export"}), 404
-
-
-# ... (You can add the /clear_tags route later if needed) ...
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
