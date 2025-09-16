@@ -37,21 +37,27 @@ def get_db_connection():
 
 @app.cli.command('init-db')
 def init_db():
-    """A Flask CLI command to initialize the database with all three tables."""
+    """A Flask CLI command to initialize the database with all tables."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
     # Tracks Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS tracks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, artist TEXT,
-            bpm REAL, track_key TEXT, genre TEXT, label TEXT, comments TEXT,
-            grouping TEXT, 
-            tags_json TEXT 
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            artist TEXT,
+            bpm REAL,
+            track_key TEXT,
+            genre TEXT,
+            label TEXT,
+            comments TEXT,
+            grouping TEXT,
+            tags_json TEXT
         );
     """)
 
-    # The new 'tags' table
+    # Tags Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS tags (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,7 +65,7 @@ def init_db():
         );
     """)
 
-    # The new 'track_tags' link table
+    # Track_tags Link Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS track_tags (
             track_id INTEGER,
@@ -70,9 +76,22 @@ def init_db():
         );
     """)
 
+    # ADDED: The new processing_log table for conversation history
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS processing_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            original_filename TEXT NOT NULL,
+            output_filename TEXT,
+            track_count INTEGER,
+            status TEXT NOT NULL
+        );
+    """)
+
     conn.commit()
     conn.close()
-    print('Database with tracks, tags, and track_tags tables initialized successfully.')
+    print('Database with all tables initialized successfully.')
+
 
 
 
@@ -152,6 +171,46 @@ def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grou
     finally:
         conn.close()
 
+def log_job_start(filename):
+    """Creates a new entry in the processing_log table for a new job."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # The comma after the SQL string is the fix
+        cursor.execute(
+            "INSERT INTO processing_log (original_filename, status) VALUES (?, ?)",
+            (filename, 'In Progress')
+        )
+        log_id = cursor.lastrowid
+        conn.commit()
+        print(f"Started logging for job ID: {log_id}")
+        return log_id
+    except sqlite3.Error as e:
+        conn.rollback()
+        print(f"Failed to create log entry: {e}")
+        return None
+    finally:
+        conn.close()
+
+def log_job_end(log_id, status, track_count, output_filename):
+    """
+    Updates a log entry with the final status and details of a completed job.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE processing_log SET status = ?, track_count = ?, output_filename = ? WHERE id = ?",
+            (status, track_count, output_filename, log_id)
+        )
+        conn.commit()
+        print(f"Finished logging for job ID: {log_id} with status: {status}")
+    except sqlite3.Error as e:
+        conn.rollback()
+        print(f"Failed to update log entry:{e}")
+    finally:
+        conn.close()
+
 
 def call_llm_for_tags(track_data, config):
     """Calls the OpenAI API to generate tags, with a robust retry mechanism."""
@@ -209,7 +268,15 @@ def call_llm_for_tags(track_data, config):
 
 # --- CORE LOGIC ---
 def process_library(input_path, output_path, config):
-    """Orchestrates the entire tagging process from XML parsing to final XML writing."""
+    """Orchestrates the entire tagging process and logs the job's status."""
+
+    # Get the original filename for logging
+    original_filename = os.path.basename(input_path)
+    log_id = log_job_start(original_filename)
+
+    if not log_id:
+        return {"error": "Failed to initialize logging for the job."}
+
     try:
         tree = ET.parse(input_path)
         root = tree.getroot()
@@ -218,6 +285,7 @@ def process_library(input_path, output_path, config):
         print(f"Found {total_tracks} tracks. Starting processing...")
 
         for index, track in enumerate(tracks):
+            # ... (The entire loop for processing each track is the same as before)
             track_name = track.get('Name')
             artist = track.get('Artist')
             print(f"\nProcessing track {index + 1}/{total_tracks}: {artist} - {track_name}")
@@ -253,7 +321,6 @@ def process_library(input_path, output_path, config):
             track.set('Comments', final_comments)
             print(f"Updated XML for: {track_name}")
 
-            # MODIFIED: Pass the raw 'generated_tags' dictionary directly.
             insert_track_data(
                 track_name, artist, track.get('AverageBpm'), track.get('Tonality'),
                 new_genre_string, track.get('Label'), final_comments, track.get('Grouping'),
@@ -261,9 +328,16 @@ def process_library(input_path, output_path, config):
             )
 
         tree.write(output_path, encoding='UTF-8', xml_declaration=True)
+
+        # Log the successful completion of the job
+        log_job_end(log_id, 'Completed', total_tracks, output_path)
+
         print(f"\nProcessing complete! New file saved at: {output_path}")
         return {"message": "Success! Your new library file is ready.", "filePath": output_path}
+
     except Exception as e:
+        # Log the failure of the job
+        log_job_end(log_id, 'Failed', 0, '')
         print(f"An error occurred during processing: {e}")
         return {"error": f"Failed to process XML: {e}"}
 
@@ -310,6 +384,24 @@ def export_xml():
     if LATEST_XML_PATH and os.path.exists(LATEST_XML_PATH):
         return send_file(LATEST_XML_PATH, as_attachment=True)
     return jsonify({"error": "No file available to export"}), 404
+
+
+@app.route('/history', methods=['GET'])
+def get_history():
+    """Retrieves the log of all past processing jobs."""
+    conn = get_db_connection()
+    try:
+        logs = conn.execute(
+            "SELECT * FROM processing_log ORDER BY timestamp DESC"
+        ).fetchall()
+        # Convert the database rows to a list of dictionaries
+        history_list = [dict(row) for row in logs]
+        return jsonify(history_list)
+    except sqlite3.Error as e:
+        print(f"Database error in get_history: {e}")
+        return jsonify({"error": "Failed to retrieve history"}), 500
+    finally:
+        conn.close()
 
 
 # --- Standard CRUD routes for direct database management ---
