@@ -35,41 +35,45 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-
 @app.cli.command('init-db')
 def init_db():
-    """A Flask CLI command to initialize the database."""
+    """A Flask CLI command to initialize the database with all three tables."""
     conn = get_db_connection()
     cursor = conn.cursor()
+
+    # Tracks Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS tracks (
             id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, artist TEXT,
             bpm REAL, track_key TEXT, genre TEXT, label TEXT, comments TEXT,
-            grouping TEXT, tags TEXT
+            grouping TEXT, 
+            tags_json TEXT 
         );
     """)
+
+    # The new 'tags' table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE
+        );
+    """)
+
+    # The new 'track_tags' link table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS track_tags (
+            track_id INTEGER,
+            tag_id INTEGER,
+            FOREIGN KEY (track_id) REFERENCES tracks (id),
+            FOREIGN KEY (tag_id) REFERENCES tags (id),
+            PRIMARY KEY (track_id, tag_id)
+        );
+    """)
+
     conn.commit()
     conn.close()
-    print('Database initialized successfully.')
+    print('Database with tracks, tags, and track_tags tables initialized successfully.')
 
-
-def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grouping, tags):
-    """Inserts a single track's metadata into the database, preventing duplicates."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT id FROM tracks WHERE name = ? AND artist = ?", (name, artist))
-        if cursor.fetchone(): return
-        cursor.execute(
-            "INSERT INTO tracks (name, artist, bpm, track_key, genre, label, comments, grouping, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (name, artist, bpm, track_key, genre, label, comments, grouping, tags)
-        )
-        conn.commit()
-    except sqlite3.Error as e:
-        conn.rollback()
-        print(f"Database error: {e}")
-    finally:
-        conn.close()
 
 
 # --- EXTERNAL API FUNCTIONS ---
@@ -85,6 +89,68 @@ def call_lexicon_api(artist, name):
     except requests.exceptions.RequestException as e:
         print(f"Lexicon API call failed for {artist} - {name}: {e}")
         return {}
+
+
+def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grouping, tags_dict):
+    """
+    Inserts a track and its associated tags into the normalized database.
+    - Adds the track to the 'tracks' table.
+    - Adds each new tag to the 'tags' table.
+    - Links the track and its tags in the 'track_tags' table.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # First, check for and insert the track, getting its ID
+        cursor.execute("SELECT id FROM tracks WHERE name = ? AND artist = ?", (name, artist))
+        existing_track = cursor.fetchone()
+
+        if existing_track:
+            print(f"Skipping duplicate track: {name} by {artist}")
+            conn.close()
+            return
+
+        # MODIFIED: Convert the dictionary to a JSON string here, right before saving.
+        tags_json_string = json.dumps(tags_dict)
+
+        cursor.execute(
+            "INSERT INTO tracks (name, artist, bpm, track_key, genre, label, comments, grouping, tags_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (name, artist, bpm, track_key, genre, label, comments, grouping, tags_json_string)
+        )
+        track_id = cursor.lastrowid
+        print(f"Successfully inserted track: {name} by {artist} (ID: {track_id})")
+
+        # Now, process and link the tags from the dictionary
+        all_tags = set()
+        # This loop will now work correctly because tags_dict is a dictionary
+        for category in tags_dict.values():
+            if isinstance(category, list):
+                for tag in category:
+                    all_tags.add(tag)
+            elif isinstance(category, str):
+                all_tags.add(category)
+
+        for tag_name in all_tags:
+            cursor.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
+            tag_row = cursor.fetchone()
+
+            if tag_row:
+                tag_id = tag_row['id']
+            else:
+                cursor.execute("INSERT INTO tags (name) VALUES (?)", (tag_name,))
+                tag_id = cursor.lastrowid
+
+            cursor.execute("INSERT INTO track_tags (track_id, tag_id) VALUES (?, ?)", (track_id, tag_id))
+
+        conn.commit()
+        print(f"Successfully linked {len(all_tags)} tags for track ID {track_id}.")
+
+    except sqlite3.Error as e:
+        conn.rollback()
+        print(f"Database error: {e}")
+    finally:
+        conn.close()
 
 
 def call_llm_for_tags(track_data, config):
@@ -187,10 +253,11 @@ def process_library(input_path, output_path, config):
             track.set('Comments', final_comments)
             print(f"Updated XML for: {track_name}")
 
+            # MODIFIED: Pass the raw 'generated_tags' dictionary directly.
             insert_track_data(
                 track_name, artist, track.get('AverageBpm'), track.get('Tonality'),
                 new_genre_string, track.get('Label'), final_comments, track.get('Grouping'),
-                json.dumps(generated_tags)
+                generated_tags
             )
 
         tree.write(output_path, encoding='UTF-8', xml_declaration=True)
@@ -199,7 +266,6 @@ def process_library(input_path, output_path, config):
     except Exception as e:
         print(f"An error occurred during processing: {e}")
         return {"error": f"Failed to process XML: {e}"}
-
 
 # --- FLASK ROUTES ---
 @app.route('/')
