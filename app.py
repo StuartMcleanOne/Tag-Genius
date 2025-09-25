@@ -268,14 +268,24 @@ def call_llm_for_tags(track_data, config):
 
 # --- CORE LOGIC ---
 def process_library(input_path, output_path, config):
-    """Orchestrates the entire tagging process and logs the job's status."""
+    """Orchestrates the entire tagging process, focusing on native comment formats and intelligent colour-coding."""
 
-    # Get the original filename for logging
     original_filename = os.path.basename(input_path)
     log_id = log_job_start(original_filename)
 
     if not log_id:
         return {"error": "Failed to initialize logging for the job."}
+
+    COLOUR_MAP = {
+        'upbeat': {'name': 'Yellow', 'hex': '0xFFFF00'},
+        'energetic': {'name': 'Orange', 'hex': '0xFFA500'},
+        'calm': {'name': 'Aqua', 'hex': '0x00FFFF'},
+        'mellow': {'name': 'Green', 'hex': '0x00FF00'},
+        'dark': {'name': 'Purple', 'hex': '0x800080'},
+        'uplifting': {'name': 'Orange', 'hex': '0xFFA500'},
+        'groovy': {'name': 'Yellow', 'hex': '0xFFFF00'},
+        'soulful': {'name': 'Blue', 'hex': '0x0000FF'}
+    }
 
     try:
         tree = ET.parse(input_path)
@@ -285,7 +295,6 @@ def process_library(input_path, output_path, config):
         print(f"Found {total_tracks} tracks. Starting processing...")
 
         for index, track in enumerate(tracks):
-            # ... (The entire loop for processing each track is the same as before)
             track_name = track.get('Name')
             artist = track.get('Artist')
             print(f"\nProcessing track {index + 1}/{total_tracks}: {artist} - {track_name}")
@@ -301,26 +310,47 @@ def process_library(input_path, output_path, config):
                 if isinstance(value, list): return value
                 return []
 
+            # 1. Set the Genre attribute
             primary_genre = ensure_list(generated_tags.get('primary_genre'))
             sub_genre = ensure_list(generated_tags.get('sub_genre'))
             new_genre_string = ", ".join(primary_genre + sub_genre)
+            track.set('Genre', new_genre_string)
 
+            # 2. Format Comments using the /* Tag / Tag */ format
             my_tag_categories = [
                 ensure_list(generated_tags.get('energy_vibe')),
                 ensure_list(generated_tags.get('situation_environment')),
                 ensure_list(generated_tags.get('components')),
                 ensure_list(generated_tags.get('time_period'))
             ]
-            flat_my_tags = [tag for sublist in my_tag_categories for tag in sublist]
-            hashtag_list = [f"#{tag.replace(' ', '_')}" for tag in flat_my_tags if tag]
-            new_comment_block = " ".join(hashtag_list)
-            original_comments = track.get('Comments', "")
-            final_comments = f"{original_comments} {new_comment_block}".strip() if original_comments else new_comment_block
+            # Capitalize the first letter of each tag for a cleaner look
+            flat_my_tags = [tag.strip().capitalize() for sublist in my_tag_categories for tag in sublist if tag]
 
-            track.set('Genre', new_genre_string)
+            # Use the /* Tag / Tag */ format and OVERWRITE existing comments
+            final_comments = f"/* {' / '.join(flat_my_tags)} */" if flat_my_tags else ""
             track.set('Comments', final_comments)
+
+            # 3. Implement intelligent colour-coding
+            track_colour = None
+            vibe_tags = ensure_list(generated_tags.get('energy_vibe'))
+            if vibe_tags:
+                for tag in vibe_tags:
+                    if tag.lower() in COLOUR_MAP:
+                        track_colour = COLOUR_MAP[tag.lower()]
+                        break
+
+            if track_colour:
+                track.set('Colour', track_colour['hex'])
+                print(f"Colour-coded track as {track_colour['name']}")
+            else:
+                if 'Colour' in track.attrib: del track.attrib['Colour']
+
+            # Ensure Grouping is cleared, as it's not used in this final approach
+            if 'Grouping' in track.attrib: del track.attrib['Grouping']
+
             print(f"Updated XML for: {track_name}")
 
+            # 4. Save to database
             insert_track_data(
                 track_name, artist, track.get('AverageBpm'), track.get('Tonality'),
                 new_genre_string, track.get('Label'), final_comments, track.get('Grouping'),
@@ -328,15 +358,11 @@ def process_library(input_path, output_path, config):
             )
 
         tree.write(output_path, encoding='UTF-8', xml_declaration=True)
-
-        # Log the successful completion of the job
         log_job_end(log_id, 'Completed', total_tracks, output_path)
-
         print(f"\nProcessing complete! New file saved at: {output_path}")
         return {"message": "Success! Your new library file is ready.", "filePath": output_path}
 
     except Exception as e:
-        # Log the failure of the job
         log_job_end(log_id, 'Failed', 0, '')
         print(f"An error occurred during processing: {e}")
         return {"error": f"Failed to process XML: {e}"}
