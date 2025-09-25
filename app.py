@@ -213,33 +213,33 @@ def log_job_end(log_id, status, track_count, output_filename):
 
 
 def call_llm_for_tags(track_data, config):
-    """Calls the OpenAI API to generate tags, with a robust retry mechanism."""
+    """Calls the OpenAI API to generate tags, including a numerical energy level."""
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         print("OPENAI_API_KEY not set. Using mock tags.")
-        return {"primary_genre": ["mock techno"], "energy_vibe": ["mock_upbeat"]}
+        return {"primary_genre": ["mock techno"], "energy_level": 7}
 
     vocab_prompt_part = "\n".join(
         f"- For '{key}', you MUST choose from this list: {', '.join(values)}"
         for key, values in CONTROLLED_VOCABULARY.items()
     )
+    # MODIFIED: Added 'energy_level' to the prompt instructions
     prompt_text = (
-        f"You are a master music curator, 'Tag Genius.' Your mission is to provide concise, structured tags for a DJ's library. Here is the track:\n\n"
+        f"You are a master music curator. Your mission is to provide structured tags for a DJ's library. Here is the track:\n\n"
         f"Track: '{track_data.get('ARTIST')} - {track_data.get('TITLE')}'\n"
         f"Existing Genre: {track_data.get('GENRE')}\nYear: {track_data.get('YEAR')}\n\n"
-        f"Provide a JSON object with these keys and up to the specified number of lowercase, string tags for each:\n"
+        f"Provide a JSON object with these keys. One key MUST be 'energy_level' with a single integer from 1 (lowest energy) to 10 (highest energy). For the other keys, provide up to the specified number of tags:\n"
         f"- primary_genre: {config.get('primary_genre', 1)}\n- sub_genre: {config.get('sub_genre', 1)}\n"
         f"{vocab_prompt_part}\n"
-        f"Your choices for all categories except primary_genre and sub_genre must come from the lists provided. Respond with a valid JSON object only."
+        f"Your choices for all tag categories must come from the lists provided. Respond with a valid JSON object only."
     )
 
     api_url = "https://api.openai.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
-    payload = {
-        "model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt_text}],
-        "response_format": {"type": "json_object"}
-    }
+    payload = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt_text}],
+               "response_format": {"type": "json_object"}}
 
+    # ... (The rest of the API call logic with retries is the same)
     max_retries = 5
     initial_delay = 2
     for attempt in range(max_retries):
@@ -265,11 +265,27 @@ def call_llm_for_tags(track_data, config):
     print(f"Max retries exceeded for track: {track_data.get('ARTIST')} - {track_data.get('TITLE')}")
     return {}
 
+def convert_energy_to_rating(energy_level):
+    """Converts a 1-10 energy level to a Rekordbox 1-5 star rating value"""
+    if not isinstance(energy_level, (int, float)):
+        return 0 # Default to 0 stars if input is not a number
+
+    if energy_level >= 9:
+        return 255  # 5 Stars
+    elif energy_level >= 7:
+        return 204  # 4 Stars
+    elif energy_level >= 5:
+        return 153  # 3 Stars
+    elif energy_level >= 3:
+        return 102  # 2 Stars
+    elif energy_level >= 1:
+        return 51   # 1 Star
+    else:
+        return 0    # 0 Stars
 
 # --- CORE LOGIC ---
 def process_library(input_path, output_path, config):
-    """Orchestrates the entire tagging process, focusing on native comment formats and intelligent colour-coding."""
-
+    """Orchestrates the entire tagging process, including colour-coding and star ratings."""
     original_filename = os.path.basename(input_path)
     log_id = log_job_start(original_filename)
 
@@ -277,14 +293,10 @@ def process_library(input_path, output_path, config):
         return {"error": "Failed to initialize logging for the job."}
 
     COLOUR_MAP = {
-        'upbeat': {'name': 'Yellow', 'hex': '0xFFFF00'},
-        'energetic': {'name': 'Orange', 'hex': '0xFFA500'},
-        'calm': {'name': 'Aqua', 'hex': '0x00FFFF'},
-        'mellow': {'name': 'Green', 'hex': '0x00FF00'},
-        'dark': {'name': 'Purple', 'hex': '0x800080'},
-        'uplifting': {'name': 'Orange', 'hex': '0xFFA500'},
-        'groovy': {'name': 'Yellow', 'hex': '0xFFFF00'},
-        'soulful': {'name': 'Blue', 'hex': '0x0000FF'}
+        'upbeat': {'name': 'Yellow', 'hex': '0xFFFF00'}, 'energetic': {'name': 'Orange', 'hex': '0xFFA500'},
+        'calm': {'name': 'Aqua', 'hex': '0x00FFFF'}, 'mellow': {'name': 'Green', 'hex': '0x00FF00'},
+        'dark': {'name': 'Purple', 'hex': '0x800080'}, 'uplifting': {'name': 'Orange', 'hex': '0xFFA500'},
+        'groovy': {'name': 'Yellow', 'hex': '0xFFFF00'}, 'soulful': {'name': 'Blue', 'hex': '0x0000FF'}
     }
 
     try:
@@ -310,27 +322,23 @@ def process_library(input_path, output_path, config):
                 if isinstance(value, list): return value
                 return []
 
-            # 1. Set the Genre attribute
+            # Set Genre
             primary_genre = ensure_list(generated_tags.get('primary_genre'))
             sub_genre = ensure_list(generated_tags.get('sub_genre'))
             new_genre_string = ", ".join(primary_genre + sub_genre)
             track.set('Genre', new_genre_string)
 
-            # 2. Format Comments using the /* Tag / Tag */ format
+            # Set Comments
             my_tag_categories = [
                 ensure_list(generated_tags.get('energy_vibe')),
                 ensure_list(generated_tags.get('situation_environment')),
-                ensure_list(generated_tags.get('components')),
-                ensure_list(generated_tags.get('time_period'))
+                ensure_list(generated_tags.get('components')), ensure_list(generated_tags.get('time_period'))
             ]
-            # Capitalize the first letter of each tag for a cleaner look
             flat_my_tags = [tag.strip().capitalize() for sublist in my_tag_categories for tag in sublist if tag]
-
-            # Use the /* Tag / Tag */ format and OVERWRITE existing comments
             final_comments = f"/* {' / '.join(flat_my_tags)} */" if flat_my_tags else ""
             track.set('Comments', final_comments)
 
-            # 3. Implement intelligent colour-coding
+            # Set Colour
             track_colour = None
             vibe_tags = ensure_list(generated_tags.get('energy_vibe'))
             if vibe_tags:
@@ -338,19 +346,25 @@ def process_library(input_path, output_path, config):
                     if tag.lower() in COLOUR_MAP:
                         track_colour = COLOUR_MAP[tag.lower()]
                         break
-
             if track_colour:
                 track.set('Colour', track_colour['hex'])
                 print(f"Colour-coded track as {track_colour['name']}")
             else:
                 if 'Colour' in track.attrib: del track.attrib['Colour']
 
-            # Ensure Grouping is cleared, as it's not used in this final approach
+            # Clear Grouping
             if 'Grouping' in track.attrib: del track.attrib['Grouping']
+
+            # ADDED: Logic for automatic star rating
+            energy_level = generated_tags.get('energy_level')
+            if energy_level is not None:
+                rating_value = convert_energy_to_rating(energy_level)
+                track.set('Rating', str(rating_value))  # Rating must be a string in XML
+                print(f"Assigned star rating based on energy level: {energy_level}/10")
 
             print(f"Updated XML for: {track_name}")
 
-            # 4. Save to database
+            # Save to database
             insert_track_data(
                 track_name, artist, track.get('AverageBpm'), track.get('Tonality'),
                 new_genre_string, track.get('Label'), final_comments, track.get('Grouping'),
