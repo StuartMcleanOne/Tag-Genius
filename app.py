@@ -7,6 +7,7 @@ import time
 from flask import Flask, jsonify, request, send_file
 from dotenv import load_dotenv
 from flask_cors import CORS
+from contextlib import contextmanager
 
 # --- SETUP ---
 # Load environment variables from a .env file
@@ -35,62 +36,84 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+@contextmanager
+def db_cursor():
+    """ A context manager for handling database connections anc cursors. """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # 'yield' passes the cursor to the 'width' block.
+        yield cursor
+        # If everything in the 'with' block was successful, commit the changes.
+        conn.commit()
+    except sqlite3.Error as e:
+        # If any database error occurs, roll back the changes.
+        conn.rollback()
+        # Re-raise the exception so we can still see the error in our logs.
+        raise e
+    finally:
+        # The part always runs ensuring the connection is closed.
+        conn.close()
+
+
+
+
 @app.cli.command('init-db')
 def init_db():
     """A Flask CLI command to initialize the database with all tables."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    try:
+        with db_cursor() as cursor:
 
-    # Tracks Table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS tracks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            artist TEXT,
-            bpm REAL,
-            track_key TEXT,
-            genre TEXT,
-            label TEXT,
-            comments TEXT,
-            grouping TEXT,
-            tags_json TEXT
-        );
-    """)
+            # Tracks Table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS tracks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    artist TEXT,
+                    bpm REAL,
+                    track_key TEXT,
+                    genre TEXT,
+                    label TEXT,
+                    comments TEXT,
+                    grouping TEXT,
+                    tags_json TEXT
+                );
+            """)
 
-    # Tags Table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS tags (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE
-        );
-    """)
+            # Tags Table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS tags (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE
+                );
+            """)
 
-    # Track_tags Link Table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS track_tags (
-            track_id INTEGER,
-            tag_id INTEGER,
-            FOREIGN KEY (track_id) REFERENCES tracks (id),
-            FOREIGN KEY (tag_id) REFERENCES tags (id),
-            PRIMARY KEY (track_id, tag_id)
-        );
-    """)
+            # Track_tags Link Table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS track_tags (
+                    track_id INTEGER,
+                    tag_id INTEGER,
+                    FOREIGN KEY (track_id) REFERENCES tracks (id),
+                    FOREIGN KEY (tag_id) REFERENCES tags (id),
+                    PRIMARY KEY (track_id, tag_id)
+                );
+            """)
 
-    # ADDED: The new processing_log table for conversation history
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS processing_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            original_filename TEXT NOT NULL,
-            output_filename TEXT,
-            track_count INTEGER,
-            status TEXT NOT NULL
-        );
-    """)
+            # ADDED: The new processing_log table for conversation history
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS processing_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    original_filename TEXT NOT NULL,
+                    output_filename TEXT,
+                    track_count INTEGER,
+                    status TEXT NOT NULL
+                );
+            """)
+        print('Database with all tables initialized successfully.')
+    except sqlite3.Error as e:
+        print(f"Database initialisation failed: {e}")
 
-    conn.commit()
-    conn.close()
-    print('Database with all tables initialized successfully.')
 
 
 
@@ -117,99 +140,90 @@ def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grou
     - Adds each new tag to the 'tags' table.
     - Links the track and its tags in the 'track_tags' table.
     """
-    conn = get_db_connection()
-    cursor = conn.cursor()
 
     try:
+        with db_cursor() as cursor:
         # First, check for and insert the track, getting its ID
-        cursor.execute("SELECT id FROM tracks WHERE name = ? AND artist = ?", (name, artist))
-        existing_track = cursor.fetchone()
+            cursor.execute(
+                "SELECT id FROM tracks WHERE name = ? AND artist = ?", (name, artist)
+            )
+            existing_track = cursor.fetchone()
+            if existing_track:
+                print(f"Skipping duplicate track: {name} by {artist}")
+                return
 
-        if existing_track:
-            print(f"Skipping duplicate track: {name} by {artist}")
-            conn.close()
-            return
+            # MODIFIED: Convert the dictionary to a JSON string here, right before saving.
+            tags_json_string = json.dumps(tags_dict)
 
-        # MODIFIED: Convert the dictionary to a JSON string here, right before saving.
-        tags_json_string = json.dumps(tags_dict)
+            cursor.execute(
+                "INSERT INTO tracks (name, artist, bpm, track_key, genre, label, comments, grouping, tags_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (name, artist, bpm, track_key, genre, label, comments, grouping, tags_json_string)
+            )
+            track_id = cursor.lastrowid
+            print(f"Successfully inserted track: {name} by {artist} (ID: {track_id})")
 
-        cursor.execute(
-            "INSERT INTO tracks (name, artist, bpm, track_key, genre, label, comments, grouping, tags_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (name, artist, bpm, track_key, genre, label, comments, grouping, tags_json_string)
-        )
-        track_id = cursor.lastrowid
-        print(f"Successfully inserted track: {name} by {artist} (ID: {track_id})")
+            # Now, process and link the tags from the dictionary
+            all_tags = set()
+            # This loop will now work correctly because tags_dict is a dictionary
+            for category in tags_dict.values():
+                if isinstance(category, list):
+                    for tag in category:
+                        all_tags.add(tag)
+                elif isinstance(category, str):
+                    all_tags.add(category)
 
-        # Now, process and link the tags from the dictionary
-        all_tags = set()
-        # This loop will now work correctly because tags_dict is a dictionary
-        for category in tags_dict.values():
-            if isinstance(category, list):
-                for tag in category:
-                    all_tags.add(tag)
-            elif isinstance(category, str):
-                all_tags.add(category)
+            for tag_name in all_tags:
+                cursor.execute(
+                    "SELECT id FROM tags WHERE name = ?", (tag_name,)
+                )
+                tag_row = cursor.fetchone()
 
-        for tag_name in all_tags:
-            cursor.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
-            tag_row = cursor.fetchone()
+                if tag_row:
+                    tag_id = tag_row['id']
+                else:
+                    cursor.execute(
+                    "INSERT INTO tags (name) VALUES (?)", (tag_name,)
+                    )
+                    tag_id = cursor.lastrowid
 
-            if tag_row:
-                tag_id = tag_row['id']
-            else:
-                cursor.execute("INSERT INTO tags (name) VALUES (?)", (tag_name,))
-                tag_id = cursor.lastrowid
+                    cursor.execute(
+                    "INSERT INTO track_tags (track_id, tag_id) VALUES (?, ?)", (track_id, tag_id)
+                    )
 
-            cursor.execute("INSERT INTO track_tags (track_id, tag_id) VALUES (?, ?)", (track_id, tag_id))
-
-        conn.commit()
-        print(f"Successfully linked {len(all_tags)} tags for track ID {track_id}.")
+            print(f"Successfully linked {len(all_tags)} tags for track ID {track_id}.")
 
     except sqlite3.Error as e:
-        conn.rollback()
         print(f"Database error: {e}")
-    finally:
-        conn.close()
 
 def log_job_start(filename):
     """Creates a new entry in the processing_log table for a new job."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        # The comma after the SQL string is the fix
-        cursor.execute(
-            "INSERT INTO processing_log (original_filename, status) VALUES (?, ?)",
-            (filename, 'In Progress')
-        )
-        log_id = cursor.lastrowid
-        conn.commit()
-        print(f"Started logging for job ID: {log_id}")
-        return log_id
+        with db_cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO processing_log (original_filename, status) VALUES (?, ?)",
+                (filename, 'In Progress')
+             )
+            log_id = cursor.lastrowid
+            print(f"Started logging for job ID: {log_id}")
+            return log_id
+
     except sqlite3.Error as e:
-        conn.rollback()
         print(f"Failed to create log entry: {e}")
         return None
-    finally:
-        conn.close()
 
 def log_job_end(log_id, status, track_count, output_filename):
     """
     Updates a log entry with the final status and details of a completed job.
     """
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute(
-            "UPDATE processing_log SET status = ?, track_count = ?, output_filename = ? WHERE id = ?",
-            (status, track_count, output_filename, log_id)
-        )
-        conn.commit()
-        print(f"Finished logging for job ID: {log_id} with status: {status}")
+        with db_cursor() as cursor:
+            cursor.execute(
+                "UPDATE processing_log SET status = ?, track_count = ?, output_filename = ? WHERE id = ?",
+                (status, track_count, output_filename, log_id)
+            )
+            print(f"Finished logging for job ID: {log_id} with status: {status}")
     except sqlite3.Error as e:
-        conn.rollback()
         print(f"Failed to update log entry:{e}")
-    finally:
-        conn.close()
 
 
 def call_llm_for_tags(track_data, config):
@@ -293,10 +307,14 @@ def process_library(input_path, output_path, config):
         return {"error": "Failed to initialize logging for the job."}
 
     COLOUR_MAP = {
-        'upbeat': {'name': 'Yellow', 'hex': '0xFFFF00'}, 'energetic': {'name': 'Orange', 'hex': '0xFFA500'},
-        'calm': {'name': 'Aqua', 'hex': '0x00FFFF'}, 'mellow': {'name': 'Green', 'hex': '0x00FF00'},
-        'dark': {'name': 'Purple', 'hex': '0x800080'}, 'uplifting': {'name': 'Orange', 'hex': '0xFFA500'},
-        'groovy': {'name': 'Yellow', 'hex': '0xFFFF00'}, 'soulful': {'name': 'Blue', 'hex': '0x0000FF'}
+        'upbeat': {'name': 'Yellow', 'hex': '0xFFFF00'},
+        'groovy': {'name': 'Yellow', 'hex': '0xFFFF00'},
+        'uplifting': {'name': 'Orange', 'hex': '0xFFA500'},
+        'energetic': {'name': 'Orange', 'hex': '0xFFA500'},
+        'calm': {'name': 'Aqua', 'hex': '0x00FFFF'},
+        'mellow': {'name': 'Green', 'hex': '0x00FF00'},
+        'dark': {'name': 'Purple', 'hex': '0x800080'},
+        'soulful': {'name': 'Blue', 'hex': '0x0000FF'}
     }
 
     try:
@@ -429,9 +447,9 @@ def export_xml():
 @app.route('/history', methods=['GET'])
 def get_history():
     """Retrieves the log of all past processing jobs."""
-    conn = get_db_connection()
     try:
-        logs = conn.execute(
+        with db_cursor() as cursor:
+            logs = cursor.execute(
             "SELECT * FROM processing_log ORDER BY timestamp DESC"
         ).fetchall()
         # Convert the database rows to a list of dictionaries
@@ -440,25 +458,28 @@ def get_history():
     except sqlite3.Error as e:
         print(f"Database error in get_history: {e}")
         return jsonify({"error": "Failed to retrieve history"}), 500
-    finally:
-        conn.close()
+
 
 
 # --- Standard CRUD routes for direct database management ---
 @app.route('/tracks', methods=['GET'])
 def get_tracks():
     """Retrieves all tracks from the local database."""
-    conn = get_db_connection()
-    tracks = conn.execute('SELECT * FROM tracks').fetchall()
-    conn.close()
-    tracks_list = [dict(row) for row in tracks]
-    for track in tracks_list:
-        if track.get('tags'):
-            try:
-                track['tags'] = json.loads(track['tags'])
-            except json.JSONDecodeError:
-                track['tags'] = {"error": "Invalid JSON"}
-    return jsonify(tracks_list)
+    try:
+        with db_cursor() as cursor:
+            tracks = cursor.execute('SELECT * FROM tracks').fetchall()
+            tracks_list = [dict(row) for row in tracks]
+            for track in tracks_list:
+                if track.get('tags'):
+                    try:
+                        track['tags'] = json.loads(track['tags'])
+                    except json.JSONDecodeError:
+                        track['tags'] = {"error": "Invalid JSON"}
+            return jsonify(tracks_list)
+    except sqlite3.Error as e:
+        print(f"Database error in get_tracks: {e}")
+        return jsonify({"error": "Failed to retrieve tracks"}), 500
+
 
 
 @app.route('/tracks', methods=['POST'])
@@ -469,33 +490,35 @@ def add_track():
     artist = data.get('artist')
     if not name or not artist:
         return jsonify({"error": "Name and artist are required."}), 400
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO tracks (name, artist) VALUES (?, ?)", (name, artist))
-        conn.commit()
-        return jsonify({"message": "Track added successfully."}), 201
+        with db_cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO tracks (name, artist) VALUES (?, ?)", (name, artist)
+            )
+            return jsonify({"message": "Track added successfully."}), 201
     except sqlite3.Error as e:
-        conn.rollback()
-        return jsonify({"error": str(e)}), 500
-    finally:
-        conn.close()
+            return jsonify({"error": str(e)}), 500
+
 
 
 @app.route('/tracks/<int:track_id>', methods=['GET'])
 def get_track(track_id):
     """Retrieves a single track by its ID from the local database."""
-    conn = get_db_connection()
-    track = conn.execute('SELECT * FROM tracks WHERE id = ?', (track_id,)).fetchone()
-    conn.close()
-    if track is None: return jsonify({"error": "Track not found"}), 404
-    track_dict = dict(track)
-    if track_dict.get('tags'):
-        try:
-            track_dict['tags'] = json.loads(track_dict['tags'])
-        except json.JSONDecodeError:
-            track_dict['tags'] = {"error": "Invalid JSON"}
-    return jsonify(track_dict)
+    try:
+        with db_cursor() as cursor:
+            track = cursor.execute(
+                'SELECT * FROM tracks WHERE id = ?', (track_id,)).fetchone()
+            if track is None: return jsonify({"error": "Track not found"}), 404
+            track_dict = dict(track)
+            if track_dict.get('tags'):
+                try:
+                    track_dict['tags'] = json.loads(track_dict['tags'])
+                except json.JSONDecodeError:
+                    track_dict['tags'] = {"error": "Invalid JSON"}
+            return jsonify(track_dict)
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 404
+
 
 
 @app.route('/tracks/<int:track_id>', methods=['PUT'])
@@ -506,39 +529,39 @@ def update_track(track_id):
     artist = data.get('artist')
     if not name or not artist:
         return jsonify({"error": "Name and artist are required"}), 400
-    conn = get_db_connection()
-    cursor = conn.cursor()
+
     try:
-        cursor.execute("SELECT * FROM tracks WHERE id = ?", (track_id,))
-        if cursor.fetchone() is None:
-            return jsonify({"error": "Track not found"}), 404
-        cursor.execute("UPDATE tracks SET name = ?, artist = ? WHERE id = ?", (name, artist, track_id))
-        conn.commit()
-        return jsonify({"message": "Track updated successfully"}), 200
+        with db_cursor() as cursor:
+            cursor.execute(
+                "SELECT * FROM tracks WHERE id = ?", (track_id,)
+            )
+            if cursor.fetchone() is None:
+                return jsonify({"error": "Track not found"}), 404
+            cursor.execute(
+                "UPDATE tracks SET name = ?, artist = ? WHERE id = ?", (name, artist, track_id)
+            )
+            return jsonify({"message": "Track updated successfully"}), 200
     except sqlite3.Error as e:
-        conn.rollback()
         return jsonify({"error": str(e)}), 500
-    finally:
-        conn.close()
 
 
 @app.route('/tracks/<int:track_id>', methods=['DELETE'])
 def delete_track(track_id):
     """Deletes a single track by its unique ID."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("SELECT * FROM tracks WHERE id = ?", (track_id,))
-        if cursor.fetchone() is None:
-            return jsonify({"error": "Track not found"}), 404
-        cursor.execute("DELETE FROM tracks WHERE id = ?", (track_id,))
-        conn.commit()
-        return jsonify({"message": "Track deleted successfully"}), 200
+        with db_cursor() as cursor:
+            cursor.execute(
+                "SELECT * FROM tracks WHERE id = ?", (track_id,)
+            )
+            if cursor.fetchone() is None:
+                return jsonify({"error": "Track not found"}), 404
+            cursor.execute(
+                "DELETE FROM tracks WHERE id = ?", (track_id,)
+            )
+            return jsonify({"message": "Track deleted successfully"}), 200
     except sqlite3.Error as e:
-        conn.rollback()
         return jsonify({"error": str(e)}), 500
-    finally:
-        conn.close()
+
 
 
 if __name__ == '__main__':
