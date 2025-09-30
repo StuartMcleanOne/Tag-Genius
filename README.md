@@ -112,7 +112,7 @@ The solution was a complete "Project Reset". This involved abandoning the corrup
 
 ### Phase 2: Rebuilding with a Professional Workflow
 
-The project rebuild began with a user-first approach, focusing on defining a clear data schema before writing code to ensure all future features could be supported. The initial database setup encountered a timing issue where the server would start before the database table was created, causin  g a "no such table: tracks" error. 
+The project rebuild began with a user-first approach, focusing on defining a clear data schema before writing code to ensure all future features could be supported. The initial database setup encountered a timing issue where the server would start before the database table was created, causin g a "no such table: tracks" error. 
 
 This was resolved by adopting a more robust, standard practice: moving the database initialization to a separate Flask CLI command (`flask init-db`), which guarantees the database is ready before the application runs.
 
@@ -136,7 +136,7 @@ This user-focused feedback, combined with crucial insights from the Lexicon docu
 
 ## Future Improvements (Roadmap)
 
-* **True "My Tag" Integration**: Investigate writing to the `Grouping` and `Colour` XML attributes to create native, colored category pills in Rekordbox automatically.
+* **True "My Tag" Integration**: Investigate writing to the `Grouping` and `Colour` XML attributes to create native, colored category pills in Rekordbox automatically. ( Failed)
 
 
 * **Scalability**: For very large libraries, implement a background task queue (e.g., Celery with Redis) to offload the slow API processing from the main web request.
