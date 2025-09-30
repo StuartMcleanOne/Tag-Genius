@@ -22,10 +22,39 @@ LATEST_XML_PATH = None
 # --- CONSTANTS ---
 # A predefined dictionary of tags to ensure the AI's output is consistent and predictable.
 CONTROLLED_VOCABULARY = {
-    "energy_vibe": ["upbeat", "energetic", "calm", "mellow", "dark", "uplifting", "groovy", "soulful"],
-    "situation_environment": ["warmup", "peak time", "after-hours", "lounge", "club", "festival", "beach", "party"],
-    "components": ["vocal", "instrumental", "synth", "bass", "piano", "percussion", "remix", "acapella"],
-    "time_period": ["1980s", "1990s", "2000s", "2010s", "2020s"]
+    # The new, high-level primary genre "buckets".
+    "primary_genre": [
+        "House", "Techno", "Drum & Bass", "Breaks", "Trance", "Ambient/Downtempo",
+        "Funk/Soul/Disco", "Hip Hop / Rap", "Reggae", "Jazz", "Blues", "Rock",
+        "Pop", "Classical", "Latin", "Caribbean", "World", "Film/Theatrical"
+    ],
+
+    # The palette of descriptive sub-genre modifiers.
+    "sub_genre": [
+        "Deep", "Tech", "Progressive", "Melodic", "Minimal", "Acid", "Tribal",
+        "Liquid", "Vocal", "Instrumental", "Afro", "Dark", "Hard", "Industrial"
+    ],
+
+    # The other categories we previously agreed on.
+    "components": [
+        "Vocal", "Instrumental", "Acapella", "Remix", "Intro", "Extended", "Edit",
+        "Synth", "Bass", "Drums", "Percussion", "Piano", "Keys", "Guitar",
+        "Strings", "Orchestral", "Saxophone", "Trumpet", "Wind", "Brass"
+    ],
+    "energy_vibe": [
+        "Aggressive", "Calm", "Chill", "Dark", "Energetic", "Funny", "Happy",
+        "Mellow", "Party", "Romantic", "Sad", "Scary", "Unwind", "Upbeat", "Warm",
+        "Driving", "Funky", "Groovy", "Hypnotic", "Soulful", "Uplifting"
+    ],
+    "situation_environment": [
+        "After-afterhours", "Afterhours", "Beach", "Closer", "Club", "Festival",
+        "Filler", "Handoff", "Lounge", "Outro", "Party", "Peak Hour", "Pre-Party",
+        "Sunset", "Warmup"
+    ],
+    "time_period": [
+        "1920s", "1930s", "1940s", "1950s", "1960s", "1970s", "1980s",
+        "1990s", "2000s", "2010s", "2020s"
+    ]
 }
 
 
@@ -233,27 +262,41 @@ def call_llm_for_tags(track_data, config):
         print("OPENAI_API_KEY not set. Using mock tags.")
         return {"primary_genre": ["mock techno"], "energy_level": 7}
 
-    vocab_prompt_part = "\n".join(
-        f"- For '{key}', you MUST choose from this list: {', '.join(values)}"
-        for key, values in CONTROLLED_VOCABULARY.items()
-    )
-    # MODIFIED: Added 'energy_level' to the prompt instructions
+    # Dynamically build the prompt parts from our new vocabulary
+    primary_genre_list = ", ".join(CONTROLLED_VOCABULARY["primary_genre"])
+    sub_genre_list = ", ".join(CONTROLLED_VOCABULARY["sub_genre"])
+    components_list = ", ".join(CONTROLLED_VOCABULARY["components"])
+    energy_vibe_list = ", ".join(CONTROLLED_VOCABULARY["energy_vibe"])
+    situation_environment_list = ", ".join(CONTROLLED_VOCABULARY["situation_environment"])
+    time_period_list = ", ".join(CONTROLLED_VOCABULARY["time_period"])
+
     prompt_text = (
-        f"You are a master music curator. Your mission is to provide structured tags for a DJ's library. Here is the track:\n\n"
+        f"You are an expert musicologist. Your mission is to provide structured, consistent tags for a DJ's library.\n\n"
+        f"Here is the track data:\n"
         f"Track: '{track_data.get('ARTIST')} - {track_data.get('TITLE')}'\n"
         f"Existing Genre: {track_data.get('GENRE')}\nYear: {track_data.get('YEAR')}\n\n"
-        f"Provide a JSON object with these keys. One key MUST be 'energy_level' with a single integer from 1 (lowest energy) to 10 (highest energy). For the other keys, provide up to the specified number of tags:\n"
-        f"- primary_genre: {config.get('primary_genre', 1)}\n- sub_genre: {config.get('sub_genre', 1)}\n"
-        f"{vocab_prompt_part}\n"
-        f"Your choices for all tag categories must come from the lists provided. Respond with a valid JSON object only."
+        f"Please provide a JSON object with the following keys, following these specific instructions:\n\n"
+        f"1. 'primary_genre': Choose EXACTLY ONE foundational genre from this list that best represents the track's core identity:\n"
+        f"   {primary_genre_list}\n\n"
+        f"2. 'sub_genre': Choose up to {config.get('sub_genre', 2)} descriptive terms from this list that further define the track's sound. These should act as modifiers to the primary genre:\n"
+        f"   {sub_genre_list}\n\n"
+        f"3. 'energy_level': Provide a single integer from 1 (lowest energy) to 10 (highest energy).\n\n"
+        f"4. For the following categories, choose up to the specified number of tags from their respective lists:\n"
+        f"   - 'energy_vibe' (up to {config.get('energy_vibe', 2)}): {energy_vibe_list}\n"
+        f"   - 'situation_environment' (up to {config.get('situation_environment', 2)}): {situation_environment_list}\n"
+        f"   - 'components' (up to {config.get('components', 3)}): {components_list}\n"
+        f"   - 'time_period' (up to {config.get('time_period', 1)}): {time_period_list}\n\n"
+        f"IMPORTANT: Your response MUST be a single, valid JSON object and nothing else."
     )
 
     api_url = "https://api.openai.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
-    payload = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt_text}],
-               "response_format": {"type": "json_object"}}
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": [{"role": "user", "content": prompt_text}],
+        "response_format": {"type": "json_object"}
+    }
 
-    # ... (The rest of the API call logic with retries is the same)
     max_retries = 5
     initial_delay = 2
     for attempt in range(max_retries):
@@ -263,7 +306,10 @@ def call_llm_for_tags(track_data, config):
             text_part = response.json().get("choices", [{}])[0].get("message", {}).get("content")
             if text_part:
                 print(f"Successfully tagged: {track_data.get('ARTIST')} - {track_data.get('TITLE')}")
-                return json.loads(text_part)
+                json_response = json.loads(text_part)
+                if isinstance(json_response.get('primary_genre'), str):
+                    json_response['primary_genre'] = [json_response['primary_genre']]
+                return json_response
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 429:
                 delay = initial_delay * (2 ** attempt)
@@ -279,6 +325,36 @@ def call_llm_for_tags(track_data, config):
     print(f"Max retries exceeded for track: {track_data.get('ARTIST')} - {track_data.get('TITLE')}")
     return {}
 
+    # Logic for API retries
+
+    max_retries = 5
+    initial_delay = 2
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
+            response.raise_for_status()
+            text_part = response.json().get("choices", [{}])[0].get("message", {}).get("content")
+            if text_part:
+                print(f"Successfully tagged: {track_data.get('ARTIST')} - {track_data.get('TITLE')}")
+                # Ensure the primary_genre is always a list
+                json_response = json.loads(text_part)
+                if isinstance(json_response.get('primary_genre'), str):
+                    json_response['primary_genre'] = [json_response['primary_genre']]
+                return json_response
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                delay = initial_delay * (2 ** attempt)
+                print(f"Rate limit hit. Retrying in {delay} seconds...")
+                time.sleep(delay)
+            else:
+                print(f"HTTP error occurred: {e}")
+                return {}
+        except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
+            print(f"An error occurred: {e}")
+            return {}
+
+    print(f"Max retries exceeded for track: {track_data.get('ARTIST')} - {track_data.get('TITLE')}")
+    return {}
 def convert_energy_to_rating(energy_level):
     """Converts a 1-10 energy level to a Rekordbox 1-5 star rating value"""
     if not isinstance(energy_level, (int, float)):
