@@ -1,3 +1,13 @@
+# Environment Variables
 .env
+
+# SQLite Database
 tag_genius.db
-__pscache__
+
+# Python Cache
+__pycache__/
+venv/
+*.pyc
+
+# IDE/OS Files
+.DS_Store
