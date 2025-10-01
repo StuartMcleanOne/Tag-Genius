@@ -2,3 +2,5 @@ flask
 python-dotenv
 requests
 flask-cors
+celery
+redis

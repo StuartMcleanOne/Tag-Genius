@@ -2,103 +2,94 @@
 
 ## Overview
 
+Tag Genius is an AI-powered music library management tool designed to automate the tedious process of tagging and organizing a DJ's music library.
 
-***
-
-Tag Genius is an AI-powered music library management tool designed to automate the tedious process of tagging and organizing a DJ's music library. 
-
-The application uses a Flask backend to parse an uploaded XML file, calls external APIs (Lexicon and OpenAI) for metadata enrichment, and uses a powerful language model to generate consistent, structured tags. 
-
-With user-controlled detail levels, the final output is a new, enhanced XML file ready for import, built to improve library searchability and streamline a DJ's workflow.
+The application uses a Flask backend to parse an uploaded Rekordbox XML file, calls external APIs (Lexicon and OpenAI) for metadata enrichment, and uses a powerful language model to generate consistent, structured tags. The final output is a new, enhanced XML file ready for import, built to improve library searchability and streamline a DJ's workflow.
 
 ***
 ## Key Features
 
-* **Rekordbox XML Processing**: Parses and writes Rekordbox-compatible XML files.
-
-
-* **AI-Powered Tagging**: Uses the OpenAI API to generate tags across six distinct categories.
-
-
-* **Configurable Detail Levels**: A simple UI allows the user to choose between "Essential," "Recommended," and "Detailed" tagging levels, controlling the depth of the AI's output.
-
-
-* **Controlled Vocabulary**: Employs prompt engineering to constrain the AI, ensuring tags are consistent and predictable.
-
-
-* **Hashtag Formatting**: Outputs tags in a clean, industry-standard `#hashtag` format in the comments field, designed for compatibility with Rekordbox's "My Tag" system.
-
-
+* **Asynchronous Processing**: Built to scale using **Celery** and **Redis**, the application processes large libraries in a background task queue. This provides an instant response to the user and prevents server timeouts, creating a robust, production-ready architecture.
+* **Real-Time Frontend Updates**: A JavaScript **polling** mechanism communicates with the backend, providing the user with real-time feedback on the job's status and automatically enabling the download button upon completion.
+* **Intelligent Genre Grouping**: Utilizes a sophisticated two-tiered "Guided Discovery" model. The AI first assigns a single high-level **Primary Genre** and then uses its own knowledge to determine specific, accurate **Sub-Genres** (e.g., "French House"), providing a perfect balance of structure and AI-driven intelligence.
+* **Automatic Color & Star Ratings**: Automatically assigns a "hot-to-cold" color and a 1-5 star rating based on an AI-generated energy score, providing DJs with useful, at-a-glance metrics for set planning.
 * **Robust Error Handling**: Includes an exponential backoff mechanism to gracefully handle API rate limits without crashing.
-
-
-* **Normalized Database**: Uses a multi-table SQLite database to professionally store and manage track and tag data.
-
-
+* **Refactored Database Logic**: All database operations use a Python context manager, ensuring connections are handled safely and efficiently.
 * **Job History**: Logs every processing job to a database and provides an API endpoint to view the history.
-
-
-* **Local API Integration**: Connects to the local Lexicon DJ application API for metadata enrichment.
 
 ## Tech Stack
 
 * **Backend**: Python, Flask
+* **Task Queue**: Celery
+* **Message Broker**: Redis (run via Docker)
 * **Database**: SQLite
-* **Frontend**: HTML, CSS, JavaScript (via Tailwind CSS)
 * **Core APIs**: OpenAI API, Lexicon Local API
 
 ## Setup and Installation
 
-1.  **Clone the repository:**
+1.  **Install Docker Desktop**: Download and install from the [official website](https://www.docker.com/products/docker-desktop/). This is required to run the Redis message broker.
+2.  **Clone the repository:**
     ```bash
     git clone <your-repo-url>
     ```
-2.  **Create and activate a virtual environment:**
+3.  **Create and activate a virtual environment:**
     ```bash
     python3 -m venv venv
     source venv/bin/activate
     ```
-3.  **Install dependencies:**
+4.  **Install dependencies:**
     ```bash
     pip install -r requirements.txt
     ```
-4.  **Create `.env` file:** Create a file named `.env` in the root directory and add your OpenAI API key:
+5.  **Create `.env` file:** Create a file named `.env` in the root directory and add your OpenAI API key:
     ```
     OPENAI_API_KEY='your_key_here'
     ```
-5.  **Initialize the database:**
+6.  **Initialize the database:**
     ```bash
     flask init-db
     ```
 
 ## How to Run the Application
 
-1.  Ensure the **Lexicon DJ application** is running on your computer.
-2.  Start the Flask backend server from the project directory:
-    ```bash
-    python app.py
-    ```
-3.  Open the `index.html` file in a web browser.
-4.  Use the interface to upload your XML file and start the tagging process.
+The application now runs as three separate services in three separate terminals. All commands should be run from the project's root directory.
 
-## API Endpoints
-
-* `POST /upload_library`: The main endpoint for uploading an XML file and a configuration object to start the tagging process.
+### **Terminal 1: Start Redis**
+This command starts the Redis message broker using Docker. You only need to run this once.
+```bash
+docker run -d --name tag-genius-redis -p 6379:6379 redis:latest
+```
+You can check if it's running with docker ps.
 
 
-* `GET /export_xml`: Allows the user to download the most recently generated tagged XML file.
+### **Terminal 2: Start the Flask Web Server**
+This terminal runs the main web application.
+```bash
+# Activate the virtual environment
+source venv/bin/activate
+
+# Run the app using the venv's python
+venv/bin/python app.py
+```
 
 
-* `GET /history`: Retrieves a JSON list of all past processing jobs.
+###  **Terminal 3: Start the Celery Worker**
+This terminal runs the background worker that processes the tagging jobs.
+```bash
+# Activate the virtual environment
+source venv/bin/activate
 
+# Run the Celery worker
+celery -A app:celery worker --loglevel=info
+```
 
-* `GET /tracks`, `GET /tracks/<id>`: Standard CRUD endpoints for viewing track data from the local database.
+Once all three services are running, you can open the index.html file in a web browser to use the application.
 
 ---
 
 ## Development Process & Key Decisions
 
-This section outlines the major phases of the MVP's development, including challenges faced and the solutions implemented.
+This section outlines the major phases of the MVP's development.including challenges faced and the solutions implemented.
 
 ### Phase 1: Project Genesis & The "Flash Model" Crisis
 
@@ -134,15 +125,23 @@ With the core engine fully functional, the project entered its final and most im
 
 This user-focused feedback, combined with crucial insights from the Lexicon documentation about Rekordbox's limitations (a 4-category limit for MyTags and the use of hashtags for data transfer), led to the final, elegant solution. The application's output was completely redesigned. The AI's six tag categories were strategically mapped to Rekordbox's native Genre field plus its four available "My Tag" slots. The Comments field was repurposed to carry this data using a clean, industry-standard hashtag format (e.g., `#peak_time #synth`). This final pivot ensured the tool was not just technically functional but truly useful, transforming a "headache" into a clean, organized, and professionally tagged music library.
 
+### Phase 5: Implementing the "Genre Grouping" Model
+
+After the initial MVP, the project underwent a significant refactoring to improve the quality of the AI's output. The original flat vocabulary system was replaced with a sophisticated "Genre Grouping" model. This involved redesigning the controlled vocabulary into a two-tiered system (`primary_genre` and `sub_genre` descriptors) and rewriting the AI prompt to support this more nuanced and logical approach to music categorization. During this phase, the database connection logic was also refactored to use a context manager for improved safety and code cleanliness.
+
+
+### Phase 6: Application Scaling and UI Feedback
+
+With the core tagging logic refined, the project's final major architectural hurdle was scalability. The synchronous design meant the app would time out on large libraries. The solution was to re-architect the application to be asynchronous using a Celery task queue with Redis as the message broker. This involved creating a background worker to handle all slow API calls, freeing up the web server to respond instantly.
+
+This change introduced a new UX problem: the user had no feedback on the job's status. To solve this, a JavaScript polling mechanism was added to the frontend. The UI now periodically calls the /history API to check the job's status and automatically updates to inform the user when the process is complete, creating a robust and user-friendly experience.
+
 ## Future Improvements (Roadmap)
 
-* **True "My Tag" Integration**: Investigate writing to the `Grouping` and `Colour` XML attributes to create native, colored category pills in Rekordbox automatically. ( Failed)
+Scalability: (Completed) The application has been re-architected with a Celery/Redis task queue to handle large processing jobs.
 
+UI/UX Refinements: Develop a more polished front-end, providing richer feedback to the user (e.g., progress bars, detailed error messages).
 
-* **Scalability**: For very large libraries, implement a background task queue (e.g., Celery with Redis) to offload the slow API processing from the main web request.
+New Features: Implement the "Clear Tags" button functionality and allow users to customize the controlled vocabulary.
 
-
-* **UI/UX Refinements**: Develop a more polished front-end with a dedicated JavaScript file, providing richer feedback to the user (e.g., progress bars, detailed error messages).
-
-
-* **New Features**: Implement the "Clear Tags" button functionality and allow users to customize the controlled vocabulary.
+True "My Tag" Integration: Investigate writing to the Grouping and Colour XML attributes to create native, colored category pills in Rekordbox automatically. (Failed)

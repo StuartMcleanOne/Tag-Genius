@@ -22,3 +22,8 @@ Detailed =
             "situation_environment": 2 < 4 x tag,
             "components": 2 < 4 x tag,
             "time_period": 1 x tag
+
+
+            timestamp
+            where the database lives
+            Upload and export

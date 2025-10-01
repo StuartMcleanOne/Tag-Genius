@@ -7,21 +7,34 @@ import time
 from flask import Flask, jsonify, request, send_file
 from dotenv import load_dotenv
 from flask_cors import CORS
+from celery import Celery
 from contextlib import contextmanager
 
+
 # --- SETUP ---
+
 # Load environment variables from a .env file
 load_dotenv()
 # Initialize the Flask application
 app = Flask(__name__)
+
+app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'
+app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
+
+celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
+celery.conf.update(app.config)
+
 # Enable Cross-Origin Resource Sharing (CORS) to allow the front-end to communicate with the backend
 CORS(app)
 # Global variable to store the path of the last generated XML file for the export function
 LATEST_XML_PATH = None
 
 # --- CONSTANTS ---
+
 # A predefined dictionary of tags to ensure the AI's output is consistent and predictable.
+
 CONTROLLED_VOCABULARY = {
+
     # The new, high-level primary genre "buckets".
     "primary_genre": [
         "House", "Techno", "Drum & Bass", "Breaks", "Trance", "Ambient/Downtempo",
@@ -32,7 +45,7 @@ CONTROLLED_VOCABULARY = {
     # The palette of descriptive sub-genre modifiers.
     "sub_genre": [
         "Deep", "Tech", "Progressive", "Melodic", "Minimal", "Acid", "Tribal",
-        "Liquid", "Vocal", "Instrumental", "Afro", "Dark", "Hard", "Industrial"
+        "Liquid", "Afro", "Dark", "Hard", "Industrial"
     ],
 
     # The other categories we previously agreed on.
@@ -59,15 +72,20 @@ CONTROLLED_VOCABULARY = {
 
 
 # --- DATABASE FUNCTIONS ---
+
 def get_db_connection():
+
     """Establishes and returns a connection to the SQLite database."""
+
     conn = sqlite3.connect('tag_genius.db')
     conn.row_factory = sqlite3.Row
     return conn
 
 @contextmanager
 def db_cursor():
+
     """ A context manager for handling database connections anc cursors. """
+
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -89,11 +107,14 @@ def db_cursor():
 
 @app.cli.command('init-db')
 def init_db():
+
     """A Flask CLI command to initialize the database with all tables."""
+
     try:
         with db_cursor() as cursor:
 
-            # Tracks Table
+            # Tracks Table.
+
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS tracks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,7 +130,8 @@ def init_db():
                 );
             """)
 
-            # Tags Table
+            # Tags Table.
+
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS tags (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,7 +139,8 @@ def init_db():
                 );
             """)
 
-            # Track_tags Link Table
+            # Track_tags Link Table.
+
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS track_tags (
                     track_id INTEGER,
@@ -128,7 +151,8 @@ def init_db():
                 );
             """)
 
-            # ADDED: The new processing_log table for conversation history
+            # The  processing_log table for conversation history.
+
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS processing_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -145,11 +169,12 @@ def init_db():
 
 
 
-
-
 # --- EXTERNAL API FUNCTIONS ---
+
 def call_lexicon_api(artist, name):
+
     """Calls the local Lexicon DJ application API to get enriched track data."""
+
     api_url = 'http://localhost:48624/v1/search/tracks'
     try:
         params = {"filter": {"artist": artist, "title": name}}
@@ -163,6 +188,7 @@ def call_lexicon_api(artist, name):
 
 
 def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grouping, tags_dict):
+
     """
     Inserts a track and its associated tags into the normalized database.
     - Adds the track to the 'tracks' table.
@@ -172,7 +198,9 @@ def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grou
 
     try:
         with db_cursor() as cursor:
+
         # First, check for and insert the track, getting its ID
+
             cursor.execute(
                 "SELECT id FROM tracks WHERE name = ? AND artist = ?", (name, artist)
             )
@@ -182,6 +210,7 @@ def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grou
                 return
 
             # MODIFIED: Convert the dictionary to a JSON string here, right before saving.
+
             tags_json_string = json.dumps(tags_dict)
 
             cursor.execute(
@@ -192,8 +221,11 @@ def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grou
             print(f"Successfully inserted track: {name} by {artist} (ID: {track_id})")
 
             # Now, process and link the tags from the dictionary
+
             all_tags = set()
+
             # This loop will now work correctly because tags_dict is a dictionary
+
             for category in tags_dict.values():
                 if isinstance(category, list):
                     for tag in category:
@@ -241,9 +273,9 @@ def log_job_start(filename):
         return None
 
 def log_job_end(log_id, status, track_count, output_filename):
-    """
-    Updates a log entry with the final status and details of a completed job.
-    """
+
+    """ Updates a log entry with the final status and details of a completed job."""
+
     try:
         with db_cursor() as cursor:
             cursor.execute(
@@ -256,13 +288,16 @@ def log_job_end(log_id, status, track_count, output_filename):
 
 
 def call_llm_for_tags(track_data, config):
+
     """Calls the OpenAI API to generate tags, including a numerical energy level."""
+
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         print("OPENAI_API_KEY not set. Using mock tags.")
         return {"primary_genre": ["mock techno"], "energy_level": 7}
 
     # Dynamically build the prompt parts from our new vocabulary
+
     primary_genre_list = ", ".join(CONTROLLED_VOCABULARY["primary_genre"])
     sub_genre_list = ", ".join(CONTROLLED_VOCABULARY["sub_genre"])
     components_list = ", ".join(CONTROLLED_VOCABULARY["components"])
@@ -297,33 +332,6 @@ def call_llm_for_tags(track_data, config):
         "response_format": {"type": "json_object"}
     }
 
-    max_retries = 5
-    initial_delay = 2
-    for attempt in range(max_retries):
-        try:
-            response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
-            response.raise_for_status()
-            text_part = response.json().get("choices", [{}])[0].get("message", {}).get("content")
-            if text_part:
-                print(f"Successfully tagged: {track_data.get('ARTIST')} - {track_data.get('TITLE')}")
-                json_response = json.loads(text_part)
-                if isinstance(json_response.get('primary_genre'), str):
-                    json_response['primary_genre'] = [json_response['primary_genre']]
-                return json_response
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 429:
-                delay = initial_delay * (2 ** attempt)
-                print(f"Rate limit hit. Retrying in {delay} seconds...")
-                time.sleep(delay)
-            else:
-                print(f"HTTP error occurred: {e}")
-                return {}
-        except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
-            print(f"An error occurred: {e}")
-            return {}
-
-    print(f"Max retries exceeded for track: {track_data.get('ARTIST')} - {track_data.get('TITLE')}")
-    return {}
 
     # Logic for API retries
 
@@ -336,7 +344,6 @@ def call_llm_for_tags(track_data, config):
             text_part = response.json().get("choices", [{}])[0].get("message", {}).get("content")
             if text_part:
                 print(f"Successfully tagged: {track_data.get('ARTIST')} - {track_data.get('TITLE')}")
-                # Ensure the primary_genre is always a list
                 json_response = json.loads(text_part)
                 if isinstance(json_response.get('primary_genre'), str):
                     json_response['primary_genre'] = [json_response['primary_genre']]
@@ -355,6 +362,11 @@ def call_llm_for_tags(track_data, config):
 
     print(f"Max retries exceeded for track: {track_data.get('ARTIST')} - {track_data.get('TITLE')}")
     return {}
+
+
+
+
+
 def convert_energy_to_rating(energy_level):
     """Converts a 1-10 energy level to a Rekordbox 1-5 star rating value"""
     if not isinstance(energy_level, (int, float)):
@@ -373,9 +385,12 @@ def convert_energy_to_rating(energy_level):
     else:
         return 0    # 0 Stars
 
+
 # --- CORE LOGIC ---
-def process_library(input_path, output_path, config):
-    """Orchestrates the entire tagging process, including colour-coding and star ratings."""
+
+@celery.task
+def process_library_task(input_path, output_path, config):
+    """Orchestrates the entire tagging process, including colour-coding and star ratings as background celery task."""
     original_filename = os.path.basename(input_path)
     log_id = log_job_start(original_filename)
 
@@ -484,7 +499,7 @@ def hello_ai():
 
 @app.route('/upload_library', methods=['POST'])
 def upload_library():
-    """Handles the XML file upload and initiates the tagging process."""
+    """Handles the XML file upload and sends the tagging processing job to the background worker"""
     global LATEST_XML_PATH
     if 'file' not in request.files: return jsonify({"error": "No file part"}), 400
     file = request.files['file']
@@ -499,14 +514,18 @@ def upload_library():
 
     if file:
         upload_folder, output_folder = "uploads", "outputs"
-        os.makedirs(upload_folder, exist_ok=True);
+        os.makedirs(upload_folder, exist_ok=True)
         os.makedirs(output_folder, exist_ok=True)
+
+        # File is still saved immediately
         input_path = os.path.join(upload_folder, file.filename)
         output_path = os.path.join(output_folder, f"tagged_{file.filename}")
         file.save(input_path)
-        result = process_library(input_path, output_path, config)
-        if "error" not in result: LATEST_XML_PATH = output_path
-        return jsonify(result), 200
+
+
+        process_library_task.delay(input_path, output_path, config)
+        LATEST_XML_PATH = output_path
+        return jsonify({"message": "Success! Your library is now being processed in the background"}), 202
 
     return jsonify({"error": "Unknown error"}), 500
 

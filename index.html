@@ -151,18 +151,18 @@
                 "level": "Recommended",
                 "primary_genre": 1,
                 "sub_genre": 2,
-                "energy_vibe": 3,
+                "energy_vibe": 2,
                 "situation_environment": 2,
-                "components": 3,
+                "components": 2,
                 "time_period": 1
             },
             "2": {
                 "level": "Detailed",
                 "primary_genre": 1,
-                "sub_genre": 4,
-                "energy_vibe": 5,
-                "situation_environment": 4,
-                "components": 4,
+                "sub_genre": 3,
+                "energy_vibe": 3,
+                "situation_environment": 3,
+                "components": 3,
                 "time_period": 1
             }
         };
@@ -200,15 +200,50 @@
             }
         }
 
+function pollJobStatus() {
+    // Start a timer that runs every 5 seconds
+    const interval = setInterval(async () => {
+        try {
+            // Ask the server for the latest job history
+            const response = await fetch('http://127.0.0.1:5001/history');
+            const history = await response.json();
+
+            // The most recent job is the first one in the list
+            if (history && history.length > 0) {
+                const latestJob = history[0];
+
+                // Use backticks (`) for template literals
+                statusMessage.textContent = `Processing... (Job status: ${latestJob.status})`;
+
+                // If the job is finished (either 'Completed' or 'Failed'), stop polling
+                if (latestJob.status === 'Completed' || latestJob.status === 'Failed') {
+                    clearInterval(interval); // Stop the timer
+
+                    // Use backticks (`) and the correct variable name
+                    statusMessage.textContent = `Job ${latestJob.status}! Your file is ready.`;
+
+                    // Show the export and clear buttons
+                    exportBtn.classList.remove('hidden');
+                    clearTagsBtn.classList.remove('hidden'); // Corrected from clearTagBtn
+                    startTaggingBtn.disabled = false;
+                }
+            }
+        } catch (error) {
+            console.error('Polling error:', error);
+            clearInterval(interval); // Stop polling on error
+        }
+    }, 5000); // Poll every 5000 milliseconds (5 seconds)
+}
+
         // --- Start Tagging Button Logic ---
-        startTaggingBtn.disabled = true;
+        startTaggingBtn.disabled = true; // Keep the button disabled initially
         startTaggingBtn.addEventListener('click', async () => {
             if (!uploadedFile) {
-                return;
+                return; // Do nothing if no file is selected
             }
 
-            statusMessage.textContent = "Processing library, please wait...";
-            startTaggingBtn.disabled = true;
+            statusMessage.textContent = "Uploading and starting job...";
+            startTaggingBtn.disabled = true; // Disable the button during processing
 
             const selectedLevel = taggingLevelInput.value;
             const config = tagConfigurations[selectedLevel];
@@ -218,7 +253,7 @@
             formData.append('config', JSON.stringify(config));
 
             try {
-                // The URL is changed to point to the correct port.
+                // This is the "happy path" where we try to contact the server.
                 const response = await fetch('http://127.0.0.1:5001/upload_library', {
                     method: 'POST',
                     body: formData,
@@ -226,17 +261,20 @@
 
                 const result = await response.json();
 
-                if (response.ok) {
+                // Check for the '202 Accepted' status, which means the background job started successfully.
+                if (response.status === 202) {
                     statusMessage.textContent = result.message;
-                    exportBtn.classList.remove('hidden');
-                    clearTagsBtn.classList.remove('hidden');
+                    pollJobStatus(); // Start polling for the final result.
                 } else {
-                    statusMessage.textContent = `Failed to process: ${result.error}`;
+                    // This handles errors returned by the server (e.g., bad config).
+                    statusMessage.textContent = `Failed to start job: ${result.error}`;
+                    startTaggingBtn.disabled = false; // Re-enable the button on failure.
                 }
             } catch (error) {
-                statusMessage.textContent = `Failed to upload: ${error.message}. Check your backend server.`;
-            } finally {
-                startTaggingBtn.disabled = false;
+                // This is the "unhappy path." It runs if the server is offline or can't be reached.
+                console.error('Upload failed:', error);
+                statusMessage.textContent = 'Upload failed. Is the server running?';
+                startTaggingBtn.disabled = false; // Re-enable the button on failure.
             }
         });
 
