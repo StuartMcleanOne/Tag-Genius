@@ -33,22 +33,17 @@ LATEST_XML_PATH = None
 
 # A predefined dictionary of tags to ensure the AI's output is consistent and predictable.
 
+# --- CONSTANTS ---
 CONTROLLED_VOCABULARY = {
-
-    # The new, high-level primary genre "buckets".
+    # The high-level primary genre "buckets".
     "primary_genre": [
         "House", "Techno", "Drum & Bass", "Breaks", "Trance", "Ambient/Downtempo",
         "Funk/Soul/Disco", "Hip Hop / Rap", "Reggae", "Jazz", "Blues", "Rock",
         "Pop", "Classical", "Latin", "Caribbean", "World", "Film/Theatrical"
     ],
+    # The sub_genre list has been intentionally removed to allow for AI discovery.
 
-    # The palette of descriptive sub-genre modifiers.
-    "sub_genre": [
-        "Deep", "Tech", "Progressive", "Melodic", "Minimal", "Acid", "Tribal",
-        "Liquid", "Afro", "Dark", "Hard", "Industrial"
-    ],
-
-    # The other categories we previously agreed on.
+    # The other categories remain as we agreed.
     "components": [
         "Vocal", "Instrumental", "Acapella", "Remix", "Intro", "Extended", "Edit",
         "Synth", "Bass", "Drums", "Percussion", "Piano", "Keys", "Guitar",
@@ -294,12 +289,11 @@ def call_llm_for_tags(track_data, config):
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         print("OPENAI_API_KEY not set. Using mock tags.")
-        return {"primary_genre": ["mock techno"], "energy_level": 7}
+        return {"primary_genre": ["mock techno"], "sub_genre": ["Minimal"], "energy_level": 7}
 
-    # Dynamically build the prompt parts from our new vocabulary
-
+    # Dynamically build the prompt parts from our vocabulary
     primary_genre_list = ", ".join(CONTROLLED_VOCABULARY["primary_genre"])
-    sub_genre_list = ", ".join(CONTROLLED_VOCABULARY["sub_genre"])
+    # Note: sub_genre_list is no longer needed as the AI will generate these freely.
     components_list = ", ".join(CONTROLLED_VOCABULARY["components"])
     energy_vibe_list = ", ".join(CONTROLLED_VOCABULARY["energy_vibe"])
     situation_environment_list = ", ".join(CONTROLLED_VOCABULARY["situation_environment"])
@@ -313,8 +307,7 @@ def call_llm_for_tags(track_data, config):
         f"Please provide a JSON object with the following keys, following these specific instructions:\n\n"
         f"1. 'primary_genre': Choose EXACTLY ONE foundational genre from this list that best represents the track's core identity:\n"
         f"   {primary_genre_list}\n\n"
-        f"2. 'sub_genre': Choose up to {config.get('sub_genre', 2)} descriptive terms from this list that further define the track's sound. These should act as modifiers to the primary genre:\n"
-        f"   {sub_genre_list}\n\n"
+        f"2. 'sub_genre': Now, using your expert knowledge, provide up to {config.get('sub_genre', 2)} specific and widely-recognized sub-genres for this track (e.g., 'French House', 'Liquid Drum & Bass', 'Delta Blues'). Do not invent obscure or overly granular genres. This field is for your expert discovery.\n\n"
         f"3. 'energy_level': Provide a single integer from 1 (lowest energy) to 10 (highest energy).\n\n"
         f"4. For the following categories, choose up to the specified number of tags from their respective lists:\n"
         f"   - 'energy_vibe' (up to {config.get('energy_vibe', 2)}): {energy_vibe_list}\n"
@@ -368,19 +361,19 @@ def call_llm_for_tags(track_data, config):
 
 
 def convert_energy_to_rating(energy_level):
-    """Converts a 1-10 energy level to a Rekordbox 1-5 star rating value"""
+    """Converts a 1-10 energy level to a Rekordbox 1-5 star rating value."""
     if not isinstance(energy_level, (int, float)):
-        return 0 # Default to 0 stars if input is not a number
+        return 0  # Default to 0 stars if input is not a number
 
     if energy_level >= 9:
         return 255  # 5 Stars
     elif energy_level >= 7:
         return 204  # 4 Stars
-    elif energy_level >= 5:
+    elif energy_level >= 4:
         return 153  # 3 Stars
-    elif energy_level >= 3:
+    elif energy_level >= 2:
         return 102  # 2 Stars
-    elif energy_level >= 1:
+    elif energy_level == 1:
         return 51   # 1 Star
     else:
         return 0    # 0 Stars
@@ -396,17 +389,6 @@ def process_library_task(input_path, output_path, config):
 
     if not log_id:
         return {"error": "Failed to initialize logging for the job."}
-
-    COLOUR_MAP = {
-        'upbeat': {'name': 'Yellow', 'hex': '0xFFFF00'},
-        'groovy': {'name': 'Yellow', 'hex': '0xFFFF00'},
-        'uplifting': {'name': 'Orange', 'hex': '0xFFA500'},
-        'energetic': {'name': 'Orange', 'hex': '0xFFA500'},
-        'calm': {'name': 'Aqua', 'hex': '0x00FFFF'},
-        'mellow': {'name': 'Green', 'hex': '0x00FF00'},
-        'dark': {'name': 'Purple', 'hex': '0x800080'},
-        'soulful': {'name': 'Blue', 'hex': '0x0000FF'}
-    }
 
     try:
         tree = ET.parse(input_path)
@@ -438,28 +420,62 @@ def process_library_task(input_path, output_path, config):
             track.set('Genre', new_genre_string)
 
             # Set Comments
-            my_tag_categories = [
-                ensure_list(generated_tags.get('energy_vibe')),
-                ensure_list(generated_tags.get('situation_environment')),
-                ensure_list(generated_tags.get('components')), ensure_list(generated_tags.get('time_period'))
-            ]
-            flat_my_tags = [tag.strip().capitalize() for sublist in my_tag_categories for tag in sublist if tag]
-            final_comments = f"/* {' / '.join(flat_my_tags)} */" if flat_my_tags else ""
+            # Define the desired order and prefixes for the tags.
+            tag_order_and_prefixes = {
+                'situation_environment': 'Sit',
+                'energy_vibe': 'Vibe',
+                'components': 'Comp',
+                'time_period': 'Time'
+            }
+
+            formatted_parts = []
+            for key, prefix in tag_order_and_prefixes.items():
+                tags = ensure_list(generated_tags.get(key))
+                if tags:
+                    # Capitalize each tag and join them with a comma
+                    tag_string = ", ".join([tag.strip().capitalize() for tag in tags])
+                    formatted_parts.append(f"{prefix}: {tag_string}")
+
+            # Join the formatted parts (e.g., "Sit: Peak Time / Vibe: Upbeat")
+            final_comments_content = ' / '.join(formatted_parts)
+            final_comments = f"/* {final_comments_content} */" if final_comments_content else ""
             track.set('Comments', final_comments)
 
-            # Set Colour
-            track_colour = None
-            vibe_tags = ensure_list(generated_tags.get('energy_vibe'))
-            if vibe_tags:
-                for tag in vibe_tags:
-                    if tag.lower() in COLOUR_MAP:
-                        track_colour = COLOUR_MAP[tag.lower()]
-                        break
-            if track_colour:
-                track.set('Colour', track_colour['hex'])
-                print(f"Colour-coded track as {track_colour['name']}")
+            # Set Colour based on Energy Level
+
+            # FIRST, check if the track is already manually set to Red.
+            if track.get('Colour') == '0xFF0000':
+                print("Track is marked as Red, skipping automatic color-coding.")
             else:
-                if 'Colour' in track.attrib: del track.attrib['Colour']
+                # If the track is not red, proceed with our automatic logic.
+                energy_level = generated_tags.get('energy_level')
+                track_colour_hex = None
+                track_colour_name = "None"
+
+                if isinstance(energy_level, int):
+                    if energy_level >= 9:
+                        track_colour_hex = '0xFF0080'  # Pink (Hottest)
+                        track_colour_name = "Pink"
+                    elif energy_level >= 7:
+                        track_colour_hex = '0xFFA500'  # Orange (Hot)
+                        track_colour_name = "Orange"
+                    elif energy_level >= 5:
+                        track_colour_hex = '0xFFFF00'  # Yellow (Warm)
+                        track_colour_name = "Yellow"
+                    elif energy_level >= 3:
+                        track_colour_hex = '0x00FF00'  # Green (Neutral)
+                        track_colour_name = "Green"
+                    elif energy_level >= 1:
+                        track_colour_hex = '0x00FFFF'  # Aqua (Coldest)
+                        track_colour_name = "Aqua"
+
+                if track_colour_hex:
+                    track.set('Colour', track_colour_hex)
+                    print(f"Colour-coded track as {track_colour_name} based on energy: {energy_level}/10")
+                else:
+                    # If no energy level or colour was determined, remove any old colour attribute
+                    if 'Colour' in track.attrib:
+                        del track.attrib['Colour']
 
             # Clear Grouping
             if 'Grouping' in track.attrib: del track.attrib['Grouping']
