@@ -4,17 +4,19 @@
 
 Tag Genius is an AI-powered music library management tool designed to automate the tedious process of tagging and organizing a DJ's music library.
 
-The application uses a Flask backend to parse an uploaded Rekordbox XML file, calls external APIs (Lexicon and OpenAI) for metadata enrichment, and uses a powerful language model to generate consistent, structured tags. The final output is a new, enhanced XML file ready for import, built to improve library searchability and streamline a DJ's workflow.
+The application uses a Flask backend, a multi-table SQLite database, and the OpenAI API to parse a user's XML file. It generates consistent, structured tags (Genres, Vibes, etc.), automatically assigns a track colour based on an AI-generated energy level, and adds a star rating based on the same metric. The final output is a new, enhanced XML file with clean, machine-readable comments.
 
 ***
 ## Key Features
 
-* **Asynchronous Processing**: Built to scale using **Celery** and **Redis**, the application processes large libraries in a background task queue. This provides an instant response to the user and prevents server timeouts, creating a robust, production-ready architecture.
+* **Asynchronous Processing**: Built to scale using **Celery** and **Redis**, the application processes large libraries in a background task queue. This provides an instant response to the user and prevents server timeouts.
 * **Real-Time Frontend Updates**: A JavaScript **polling** mechanism communicates with the backend, providing the user with real-time feedback on the job's status and automatically enabling the download button upon completion.
-* **Intelligent Genre Grouping**: Utilizes a sophisticated two-tiered "Guided Discovery" model. The AI first assigns a single high-level **Primary Genre** and then uses its own knowledge to determine specific, accurate **Sub-Genres** (e.g., "French House"), providing a perfect balance of structure and AI-driven intelligence.
-* **Automatic Color & Star Ratings**: Automatically assigns a "hot-to-cold" color and a 1-5 star rating based on an AI-generated energy score, providing DJs with useful, at-a-glance metrics for set planning.
-* **Robust Error Handling**: Includes an exponential backoff mechanism to gracefully handle API rate limits without crashing.
-* **Refactored Database Logic**: All database operations use a Python context manager, ensuring connections are handled safely and efficiently.
+* **Intelligent Genre Grouping**: Utilizes a sophisticated **"Guided Discovery"** model. The AI first assigns a single high-level **Primary Genre** and then uses its own knowledge to determine specific, accurate **Sub-Genres** (e.g., "French House"), providing a perfect balance of structure and AI-driven intelligence.
+* **Energy-Based Color & Star Ratings**:
+    * **Color**: Automatically assigns a color from a "hot-to-cold" scale (Pink → Aqua) based on the AI's objective 1-10 energy score, providing a consistent, at-a-glance energy indicator.
+    * **Star Rating**: Converts the same 1-10 energy score to a 1-5 star rating using a refined scale that ensures a meaningful and useful distribution of ratings.
+* **User Override Protection**: Respects a user's manual workflow by automatically detecting and preserving any tracks manually colored "Red" in Rekordbox, preventing them from being overwritten.
+* **Organized Comment Formatting**: All generated tags are written to the `Comments` field in a clean, prefixed, and logically ordered format (`/* Sit: ... / Vibe: ... */`) for improved readability.
 * **Job History**: Logs every processing job to a database and provides an API endpoint to view the history.
 
 ## Tech Stack
@@ -55,12 +57,10 @@ The application uses a Flask backend to parse an uploaded Rekordbox XML file, ca
 The application now runs as three separate services in three separate terminals. All commands should be run from the project's root directory.
 
 ### **Terminal 1: Start Redis**
-This command starts the Redis message broker using Docker. You only need to run this once.
+This command starts the Redis message broker using Docker.
 ```bash
 docker run -d --name tag-genius-redis -p 6379:6379 redis:latest
 ```
-You can check if it's running with docker ps.
-
 
 ### **Terminal 2: Start the Flask Web Server**
 This terminal runs the main web application.
@@ -136,12 +136,13 @@ With the core tagging logic refined, the project's final major architectural hur
 
 This change introduced a new UX problem: the user had no feedback on the job's status. To solve this, a JavaScript polling mechanism was added to the frontend. The UI now periodically calls the /history API to check the job's status and automatically updates to inform the user when the process is complete, creating a robust and user-friendly experience.
 
-## Future Improvements (Roadmap)
+### Phase 7: User-Driven Refinement Sprint
 
-Scalability: (Completed) The application has been re-architected with a Celery/Redis task queue to handle large processing jobs.
+Following the successful implementation of the asynchronous architecture, a full end-to-end test was conducted. Based on a critical review of the AI's output, a series of user-driven refinements were implemented to elevate the application from "functional" to "genuinely useful." This included overhauling the genre model to a "Guided Discovery" system, linking color-coding directly to an objective energy score, refining the star-rating scale for better distribution, and improving the formatting of the final comment tags for readability. This phase was a crucial example of using real-world testing to inform product design.
+
+## Future Improvements (Roadmap)
 
 UI/UX Refinements: Develop a more polished front-end, providing richer feedback to the user (e.g., progress bars, detailed error messages).
 
 New Features: Implement the "Clear Tags" button functionality and allow users to customize the controlled vocabulary.
 
-True "My Tag" Integration: Investigate writing to the Grouping and Colour XML attributes to create native, colored category pills in Rekordbox automatically. (Failed)
