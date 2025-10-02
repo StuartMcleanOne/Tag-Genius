@@ -35,28 +35,31 @@ LATEST_XML_PATH = None
 
 # --- CONSTANTS ---
 CONTROLLED_VOCABULARY = {
-    # The high-level primary genre "buckets".
+    # High level primary genre "buckets"
+
     "primary_genre": [
         "House", "Techno", "Drum & Bass", "Breaks", "Trance", "Ambient/Downtempo",
         "Funk/Soul/Disco", "Hip Hop / Rap", "Reggae", "Jazz", "Blues", "Rock",
         "Pop", "Classical", "Latin", "Caribbean", "World", "Film/Theatrical"
     ],
-    # The sub_genre list has been intentionally removed to allow for AI discovery.
+    # sub_genre list is removed for AI "Guided Discovery"
 
-    # The other categories remain as we agreed.
     "components": [
         "Vocal", "Instrumental", "Acapella", "Remix", "Intro", "Extended", "Edit",
         "Synth", "Bass", "Drums", "Percussion", "Piano", "Keys", "Guitar",
         "Strings", "Orchestral", "Saxophone", "Trumpet", "Wind", "Brass"
     ],
+    # Tighter vibe list, removing overlaps.
+
     "energy_vibe": [
-        "Aggressive", "Calm", "Chill", "Dark", "Energetic", "Funny", "Happy",
-        "Mellow", "Party", "Romantic", "Sad", "Scary", "Unwind", "Upbeat", "Warm",
-        "Driving", "Funky", "Groovy", "Hypnotic", "Soulful", "Uplifting"
+        "Aggressive", "Calm", "Dark", "Driving", "Energetic", "Funky",
+        "Happy", "Hypnotic", "Mellow", "Romantic", "Soulful", "Uplifting"
     ],
+    # Removed club and festival to force Ai to present better information to DJ.
+
     "situation_environment": [
-        "After-afterhours", "Afterhours", "Beach", "Closer", "Club", "Festival",
-        "Filler", "Handoff", "Lounge", "Outro", "Party", "Peak Hour", "Pre-Party",
+        "After-afterhours", "Afterhours", "Beach", "Closer", "Filler",
+        "Handoff", "Lounge", "Outro", "Party", "Peak Hour", "Pre-Party",
         "Sunset", "Warmup"
     ],
     "time_period": [
