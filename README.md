@@ -17,7 +17,7 @@ The application uses a Flask backend, a multi-table SQLite database, and the Ope
     * **Star Rating**: Converts the same 1-10 energy score to a 1-5 star rating using a refined scale that ensures a meaningful and useful distribution of ratings.
 * **User Override Protection**: Respects a user's manual workflow by automatically detecting and preserving any tracks manually colored "Red" in Rekordbox, preventing them from being overwritten.
 * **Organized Comment Formatting**: All generated tags are written to the `Comments` field in a clean, prefixed, and logically ordered format (`/* Sit: ... / Vibe: ... */`) for improved readability.
-* **Job History**: Logs every processing job to a database and provides an API endpoint to view the history.
+* **Job Archiving & History**: Fulfills the "Retaining Conversation History" MVP requirement. For every job, a "before" (original) and "after" (tagged) XML file is archived with a unique timestamp. A dedicated API endpoint allows for downloading these files as a `.zip` package, providing a crucial safety and rollback feature.
 
 ## Tech Stack
 
@@ -26,6 +26,19 @@ The application uses a Flask backend, a multi-table SQLite database, and the Ope
 * **Message Broker**: Redis (run via Docker)
 * **Database**: SQLite
 * **Core APIs**: OpenAI API, Lexicon Local API
+
+## API Endpoints
+
+* **POST /upload_library:** The main endpoint for uploading an XML file and a configuration object. Kicks off the asynchronous tagging process and returns a 202 Accepted status.
+
+
+* **GET /history:** Retrieves a JSON list of all past processing jobs, ordered from newest to oldest. This is used by the frontend for status polling.
+
+
+* **GET /download_job/<int:job_id>:** Downloads a .zip package containing the archived "before" (original) and "after" (tagged) XML files for a specific job run.
+
+
+* **GET /export_xml:** Allows the user to download the most recently generated tagged XML file.
 
 ## Setup and Installation
 
@@ -139,6 +152,9 @@ This change introduced a new UX problem: the user had no feedback on the job's s
 ### Phase 7: User-Driven Refinement Sprint
 
 Following the successful implementation of the asynchronous architecture, a full end-to-end test was conducted. Based on a critical review of the AI's output, a series of user-driven refinements were implemented to elevate the application from "functional" to "genuinely useful." This included overhauling the genre model to a "Guided Discovery" system, linking color-coding directly to an objective energy score, refining the star-rating scale for better distribution, and improving the formatting of the final comment tags for readability. This phase was a crucial example of using real-world testing to inform product design.
+
+### Phase 8: Fulfilling the "Conversation History" MVP Requirement
+To meet the final MVP requirement, a user-centric "Job Archiving" feature was designed and implemented. This feature interprets "Conversation History" as a tangible "before and after" snapshot of each processing job. The backend was updated to save unique, timestamped copies of both the input and output XML files, and the `processing_log` database table was modified to store the paths to this archive. A new API endpoint was created to allow the user to download these paired files as a `.zip` package, providing a robust rollback and comparison capability.
 
 ## Future Improvements (Roadmap)
 
