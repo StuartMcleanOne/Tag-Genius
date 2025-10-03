@@ -4,11 +4,14 @@ import xml.etree.ElementTree as ET
 import json
 import requests
 import time
+import io
+import zipfile
 from flask import Flask, jsonify, request, send_file
 from dotenv import load_dotenv
 from flask_cors import CORS
 from celery import Celery
 from contextlib import contextmanager
+from datetime import datetime
 
 
 # --- SETUP ---
@@ -156,7 +159,8 @@ def init_db():
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                     original_filename TEXT NOT NULL,
-                    output_filename TEXT,
+                    input_file_path TEXT,
+                    output_file_path TEXT,
                     track_count INTEGER,
                     status TEXT NOT NULL
                 );
@@ -254,36 +258,36 @@ def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grou
     except sqlite3.Error as e:
         print(f"Database error: {e}")
 
-def log_job_start(filename):
+def log_job_start(filename, input_path):
+
     """Creates a new entry in the processing_log table for a new job."""
+
     try:
         with db_cursor() as cursor:
             cursor.execute(
-                "INSERT INTO processing_log (original_filename, status) VALUES (?, ?)",
-                (filename, 'In Progress')
-             )
+                "INSERT INTO processing_log (original_filename, input_file_path, status) VALUES (?, ?, ?)",
+                (filename, input_path, 'In Progress')
+            )
             log_id = cursor.lastrowid
-            print(f"Started logging for job ID: {log_id}")
+            print(f"Start logging for job ID: {log_id}")
             return log_id
-
     except sqlite3.Error as e:
         print(f"Failed to create log entry: {e}")
         return None
 
-def log_job_end(log_id, status, track_count, output_filename):
+def log_job_end(log_id, status, track_count, output_path):
 
     """ Updates a log entry with the final status and details of a completed job."""
 
     try:
         with db_cursor() as cursor:
             cursor.execute(
-                "UPDATE processing_log SET status = ?, track_count = ?, output_filename = ? WHERE id = ?",
-                (status, track_count, output_filename, log_id)
+                "UPDATE processing_log SET status = ?, track_count = ?, output_file_path = ? WHERE id = ?",
+                (status, track_count, output_path, log_id)
             )
-            print(f"Finished logging for job ID: {log_id} with status: {status}")
+            print(f"Finished loggin for job ID: {log_id} with status: {status}")
     except sqlite3.Error as e:
         print(f"Failed to update log entry:{e}")
-
 
 def call_llm_for_tags(track_data, config):
 
@@ -360,9 +364,6 @@ def call_llm_for_tags(track_data, config):
     return {}
 
 
-
-
-
 def convert_energy_to_rating(energy_level):
     """Converts a 1-10 energy level to a Rekordbox 1-5 star rating value."""
     if not isinstance(energy_level, (int, float)):
@@ -386,9 +387,11 @@ def convert_energy_to_rating(energy_level):
 
 @celery.task
 def process_library_task(input_path, output_path, config):
+
     """Orchestrates the entire tagging process, including colour-coding and star ratings as background celery task."""
+
     original_filename = os.path.basename(input_path)
-    log_id = log_job_start(original_filename)
+    log_id = log_job_start(original_filename, input_path)
 
     if not log_id:
         return {"error": "Failed to initialize logging for the job."}
@@ -505,16 +508,18 @@ def process_library_task(input_path, output_path, config):
         return {"message": "Success! Your new library file is ready.", "filePath": output_path}
 
     except Exception as e:
-        log_job_end(log_id, 'Failed', 0, '')
+        log_job_end(log_id, 'Failed', 0, output_path)
         print(f"An error occurred during processing: {e}")
         return {"error": f"Failed to process XML: {e}"}
 
 # --- FLASK ROUTES ---
+
 @app.route('/')
 def hello_ai():
-    """A simple route to confirm the server is running."""
-    return 'Hello, Ai!'
 
+    """A simple route to confirm the server is running."""
+
+    return 'Hello, Ai!'
 
 @app.route('/upload_library', methods=['POST'])
 def upload_library():
@@ -532,26 +537,45 @@ def upload_library():
         return jsonify({"error": "Invalid config format"}), 400
 
     if file:
+
+        # Get original filename and split it into name and extension.
+        original_filename = file.filename
+        name, ext = os.path.splitext(original_filename)
+
+        # Create a unique string (e.g., "20251002-124530")
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+        # Create the new unique filenames for the input and output files
+        unique_input_filename = f"{name}_{timestamp}{ext}"
+        unique_output_filename = f"tagged_{name}_{timestamp}{ext}"
+
+        # Define the full paths for saving
         upload_folder, output_folder = "uploads", "outputs"
         os.makedirs(upload_folder, exist_ok=True)
         os.makedirs(output_folder, exist_ok=True)
 
-        # File is still saved immediately
-        input_path = os.path.join(upload_folder, file.filename)
-        output_path = os.path.join(output_folder, f"tagged_{file.filename}")
+        input_path =os.path.join(upload_folder, unique_input_filename)
+        output_path = os.path.join(output_folder, unique_output_filename)
+
+        # Save the uploaded file with its new unique file name
         file.save(input_path)
 
-
+        # Pass the unique paths to the background task
         process_library_task.delay(input_path, output_path, config)
+
         LATEST_XML_PATH = output_path
-        return jsonify({"message": "Success! Your library is now being processed in the background"}), 202
+
+        return jsonify({"message": "Success! Your library is now being processed in the background."}), 202
 
     return jsonify({"error": "Unknown error"}), 500
 
 
+
 @app.route('/export_xml', methods=['GET'])
 def export_xml():
+
     """Allows the user to download the most recently generated XML file."""
+
     global LATEST_XML_PATH
     if LATEST_XML_PATH and os.path.exists(LATEST_XML_PATH):
         return send_file(LATEST_XML_PATH, as_attachment=True)
@@ -560,7 +584,9 @@ def export_xml():
 
 @app.route('/history', methods=['GET'])
 def get_history():
+
     """Retrieves the log of all past processing jobs."""
+
     try:
         with db_cursor() as cursor:
             logs = cursor.execute(
@@ -573,12 +599,57 @@ def get_history():
         print(f"Database error in get_history: {e}")
         return jsonify({"error": "Failed to retrieve history"}), 500
 
+@app.route('/download_job/<int:job_id>', methods=['GET'])
+def download_job_package(job_id):
+
+    """
+    Finds a job by its ID, zips up its input and output files,
+    and sends them to the user as a downloadable package.
+    """
+
+    try:
+        with db_cursor() as cursor:
+            log_entry = cursor.execute(
+                "SELECT input_file_path, output_file_path FROM processing_log WHERE id = ?",
+                (job_id,)
+            ).fetchone()
+
+        if not log_entry or not log_entry['input_file_path'] or not log_entry['output_file_path']:
+            return jsonify({"error": "Job or files not found"}), 404
+
+        input_path = log_entry['input_file_path']
+        output_path = log_entry['output_file_path']
+
+        # Create an in-memory zip file
+
+        memory_file = io.BytesIO()
+        with zipfile.ZipFile(memory_file, 'w') as zf:
+
+            # Add the 'before' and 'after' files to the zip with clean names
+
+            zf.write(input_path, arcname='original_library.xml')
+            zf.write(output_path, arcname='tagged_library.xml')
+        memory_file.seek(0)
+
+        return send_file(
+            memory_file,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f'tag_genius_job_{job_id}.zip'
+        )
+
+    except Exception as e:
+        print(f"Error creating zip package for job {job_id}: {e}")
+        return jsonify({"error": "Failed to create download package"}), 500
 
 
 # --- Standard CRUD routes for direct database management ---
+
 @app.route('/tracks', methods=['GET'])
 def get_tracks():
+
     """Retrieves all tracks from the local database."""
+
     try:
         with db_cursor() as cursor:
             tracks = cursor.execute('SELECT * FROM tracks').fetchall()
