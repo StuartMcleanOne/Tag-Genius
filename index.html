@@ -79,12 +79,15 @@
             </p>
         </div>
 
-        <!-- Tagging Level Selector -->
         <div class="space-y-4">
             <label for="tagging-level" class="block text-sm font-medium text-gray-700">Tagging Detail Level</label>
             <div class="relative w-full">
-                <input type="range" id="tagging-level" min="0" max="2" value="0" class="w-full">
+                <input type="range" id="tagging-level" min="0" max="3" value="2" class="w-full">
                 <div class="flex justify-between text-xs text-gray-500 mt-2">
+                    <div class="tooltip relative">
+                        <span>None</span>
+                        <span class="tooltip-text">Skips AI tagging. Use with "Clear Tags" for a cleaning-only utility.</span>
+                    </div>
                     <div class="tooltip relative">
                         <span>Essential</span>
                         <span class="tooltip-text">Receive only the core tags like primary genre and overall vibe.</span>
@@ -101,8 +104,17 @@
             </div>
         </div>
 
-        <!-- File Upload Area -->
-        <div id="drag-area" class="drag-area border-2 border-gray-300 rounded-lg p-8 text-center cursor-pointer transition-colors duration-200">
+        <div class="relative flex items-start">
+            <div class="flex h-6 items-center">
+                <input id="clearTagsCheckbox" name="clear_tags" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600">
+            </div>
+            <div class="ml-3 text-sm leading-6">
+                <label for="clearTagsCheckbox" class="font-medium text-gray-900">Clear existing AI tags</label>
+                <p class="text-gray-500">Useful for re-processing a previously tagged file.</p>
+            </div>
+        </div>
+
+        <div id="drag-area" class="drag-area">
             <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
                 <path d="M28 8H12a2 2 0 00-2 2v20m30-20L28 8m0 0l4 4m-4-4V24m-12 8a2 2 0 01-2-2V8a2 2 0 012-2h12.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V28a2 2 0 01-2 2h-2m-3 8a2 2 0 002 2h4a2 2 0 002-2v-4m-6 4a2 2 0 01-2-2v-4a2 2 0 012-2h4a2 2 0 012 2v4a2 2 0 01-2 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
             </svg>
@@ -114,14 +126,11 @@
         <div id="status-message" class="text-center text-sm font-medium mt-4"></div>
 
         <div class="flex justify-center space-x-4 mt-6">
-            <button id="start-tagging-btn" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-full shadow-md hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed">
-                Start Tagging
+            <button id="start-tagging-btn" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-full shadow-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                Start Process
             </button>
-            <button id="export-btn" class="px-6 py-3 bg-gray-500 text-white font-semibold rounded-full shadow-md hover:bg-gray-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50 hidden">
+            <button id="export-btn" class="px-6 py-3 bg-gray-500 text-white font-semibold rounded-full shadow-md hover:bg-gray-600 hidden">
                 Export XML
-            </button>
-            <button id="clear-tags-btn" class="px-6 py-3 bg-red-500 text-white font-semibold rounded-full shadow-md hover:bg-red-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-50 hidden">
-                Clear Tags
             </button>
         </div>
     </div>
@@ -131,129 +140,86 @@
         const fileInput = document.getElementById('file-input');
         const startTaggingBtn = document.getElementById('start-tagging-btn');
         const exportBtn = document.getElementById('export-btn');
-        const clearTagsBtn = document.getElementById('clear-tags-btn');
         const statusMessage = document.getElementById('status-message');
         const taggingLevelInput = document.getElementById('tagging-level');
         let uploadedFile = null;
 
         // --- Tagging Configurations ---
+
         const tagConfigurations = {
-            "0": {
-                "level": "Essential",
-                "primary_genre": 1,
-                "sub_genre": 1,
-                "energy_vibe": 1,
-                "situation_environment": 1,
-                "components": 1,
-                "time_period": 1
-            },
-            "1": {
-                "level": "Recommended",
-                "primary_genre": 1,
-                "sub_genre": 2,
-                "energy_vibe": 2,
-                "situation_environment": 2,
-                "components": 2,
-                "time_period": 1
-            },
-            "2": {
-                "level": "Detailed",
-                "primary_genre": 1,
-                "sub_genre": 3,
-                "energy_vibe": 3,
-                "situation_environment": 3,
-                "components": 3,
-                "time_period": 1
-            }
+            "0": { "level": "None" },
+            "1": { "level": "Essential", "sub_genre": 1, "energy_vibe": 1, "situation_environment": 1, "components": 1, "time_period": 1 },
+            "2": { "level": "Recommended", "sub_genre": 2, "energy_vibe": 2, "situation_environment": 2, "components": 2, "time_period": 1 },
+            "3": { "level": "Detailed", "sub_genre": 3, "energy_vibe": 3, "situation_environment": 3, "components": 3, "time_period": 1 }
         };
 
         // --- Event Listeners for File Drag & Drop ---
-        dragArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dragArea.classList.add('active');
-        });
-
-        dragArea.addEventListener('dragleave', () => {
-            dragArea.classList.remove('active');
-        });
-
-        dragArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dragArea.classList.remove('active');
-            handleFile(e.dataTransfer.files[0]);
-        });
-
-        dragArea.addEventListener('click', () => {
-            fileInput.click();
-        });
-
-        fileInput.addEventListener('change', (e) => {
-            handleFile(e.target.files[0]);
-        });
+        dragArea.addEventListener('dragover', (e) => { e.preventDefault(); dragArea.classList.add('active'); });
+        dragArea.addEventListener('dragleave', () => { dragArea.classList.remove('active'); });
+        dragArea.addEventListener('drop', (e) => { e.preventDefault(); dragArea.classList.remove('active'); handleFile(e.dataTransfer.files[0]); });
+        dragArea.addEventListener('click', () => { fileInput.click(); });
+        fileInput.addEventListener('change', (e) => { handleFile(e.target.files[0]); });
 
         function handleFile(file) {
             uploadedFile = file;
             if (uploadedFile) {
                 statusMessage.textContent = `File selected: ${uploadedFile.name}`;
                 startTaggingBtn.disabled = false;
-                startTaggingBtn.classList.remove('disabled:opacity-50', 'disabled:cursor-not-allowed');
             }
         }
 
-function pollJobStatus() {
-    // Start a timer that runs every 5 seconds
-    const interval = setInterval(async () => {
-        try {
-            // Ask the server for the latest job history
-            const response = await fetch('http://127.0.0.1:5001/history');
-            const history = await response.json();
+        function pollJobStatus() {
+            const interval = setInterval(async () => {
+                try {
+                    const response = await fetch('http://127.0.0.1:5001/history');
+                    const history = await response.json();
 
-            // The most recent job is the first one in the list
-            if (history && history.length > 0) {
-                const latestJob = history[0];
+                    if (history && history.length > 0) {
+                        const latestJob = history[0];
+                        statusMessage.textContent = `Processing... (Job status: ${latestJob.status})`;
 
-                // Use backticks (`) for template literals
-                statusMessage.textContent = `Processing... (Job status: ${latestJob.status})`;
-
-                // If the job is finished (either 'Completed' or 'Failed'), stop polling
-                if (latestJob.status === 'Completed' || latestJob.status === 'Failed') {
-                    clearInterval(interval); // Stop the timer
-
-                    // Use backticks (`) and the correct variable name
-                    statusMessage.textContent = `Job ${latestJob.status}! Your file is ready.`;
-
-                    // Show the export and clear buttons
-                    exportBtn.classList.remove('hidden');
-                    clearTagsBtn.classList.remove('hidden'); // Corrected from clearTagBtn
-                    startTaggingBtn.disabled = false;
+                        if (latestJob.status === 'Completed' || latestJob.status === 'Failed') {
+                            clearInterval(interval);
+                            statusMessage.textContent = `Job ${latestJob.status}! Your file is ready.`;
+                            exportBtn.classList.remove('hidden');
+                            startTaggingBtn.disabled = false;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                    clearInterval(interval);
                 }
-            }
-        } catch (error) {
-            console.error('Polling error:', error);
-            clearInterval(interval); // Stop polling on error
+            }, 5000);
         }
-    }, 5000); // Poll every 5000 milliseconds (5 seconds)
-}
 
-        // --- Start Tagging Button Logic ---
-        startTaggingBtn.disabled = true; // Keep the button disabled initially
+        // --- Start Process Button Logic ---
+        startTaggingBtn.disabled = true;
         startTaggingBtn.addEventListener('click', async () => {
-            if (!uploadedFile) {
-                return; // Do nothing if no file is selected
-            }
+            if (!uploadedFile) { return; }
 
             statusMessage.textContent = "Uploading and starting job...";
-            startTaggingBtn.disabled = true; // Disable the button during processing
+            startTaggingBtn.disabled = true;
+            exportBtn.classList.add('hidden');
 
             const selectedLevel = taggingLevelInput.value;
             const config = tagConfigurations[selectedLevel];
+
+            // MODIFIED: Add the clear_tags flag to the config object
+            config.clear_tags = document.getElementById('clearTagsCheckbox').checked;
+
+            // Also changed button text to "Start Process"
+            if (config.level === 'None' && config.clear_tags) {
+                startTaggingBtn.textContent = 'Clearing Tags...';
+            } else {
+                startTaggingBtn.textContent = 'Start Tagging';
+            }
+
 
             const formData = new FormData();
             formData.append('file', uploadedFile);
             formData.append('config', JSON.stringify(config));
 
             try {
-                // This is the "happy path" where we try to contact the server.
                 const response = await fetch('http://127.0.0.1:5001/upload_library', {
                     method: 'POST',
                     body: formData,
@@ -261,24 +227,21 @@ function pollJobStatus() {
 
                 const result = await response.json();
 
-                // Check for the '202 Accepted' status, which means the background job started successfully.
                 if (response.status === 202) {
                     statusMessage.textContent = result.message;
-                    pollJobStatus(); // Start polling for the final result.
+                    pollJobStatus();
                 } else {
-                    // This handles errors returned by the server (e.g., bad config).
                     statusMessage.textContent = `Failed to start job: ${result.error}`;
-                    startTaggingBtn.disabled = false; // Re-enable the button on failure.
+                    startTaggingBtn.disabled = false;
                 }
             } catch (error) {
-                // This is the "unhappy path." It runs if the server is offline or can't be reached.
                 console.error('Upload failed:', error);
                 statusMessage.textContent = 'Upload failed. Is the server running?';
-                startTaggingBtn.disabled = false; // Re-enable the button on failure.
+                startTaggingBtn.disabled = false;
             }
         });
 
-        // --- Export & Clear Buttons Logic ---
+        // --- Export Button Logic ---
         exportBtn.addEventListener('click', async () => {
             statusMessage.textContent = "Exporting file...";
             try {
@@ -300,25 +263,6 @@ function pollJobStatus() {
                 }
             } catch (error) {
                 statusMessage.textContent = `Failed to export: ${error.message}`;
-            }
-        });
-
-        clearTagsBtn.addEventListener('click', async () => {
-            statusMessage.textContent = "Clearing tags...";
-            try {
-                const response = await fetch('http://127.0.0.1:5001/clear_tags', {
-                    method: 'PUT',
-                });
-                const result = await response.json();
-                if (response.ok) {
-                    statusMessage.textContent = result.message;
-                    exportBtn.classList.add('hidden');
-                    clearTagsBtn.classList.add('hidden');
-                } else {
-                    statusMessage.textContent = `Failed to clear tags: ${result.error}`;
-                }
-            } catch (error) {
-                statusMessage.textContent = `Failed to clear tags: ${error.message}`;
             }
         });
     </script>

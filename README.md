@@ -209,9 +209,36 @@ During the intensive testing and calibration phase, a repetitive and error-prone
 
 A new Flask CLI command, **`flask drop-tables`**, was created to programmatically delete all tables from the database. This was then combined with the existing `flask init-db` command into a single, one-line terminal command (`flask drop-tables && flask init-db`) to provide a complete, one-step reset of the development environment. This automated a crucial part of the testing workflow, increasing speed and reducing the potential for user error during a critical development phase.
 
+
 ## Future Improvements (Roadmap)
 
-UI/UX Refinements: Develop a more polished front-end, providing richer feedback to the user (e.g., progress bars, detailed error messages).
+With the core AI engine calibrated and the application architecture stable, the focus now shifts to enhancing user control, improving the user experience, and expanding the application's capabilities.
 
-New Features: Implement the "Clear Tags" button functionality and allow users to customize the controlled vocabulary.
+---
+### Core Functionality (Immediate Next Steps)
 
+These features build directly on the existing backend and add significant value for the user.
+
+* **Implement "Clear Tags" Feature:** Finalize and implement the planned "stateless" version of the "Clear Tags" feature. This will allow users to re-process a previously tagged library by checking a box on upload, which will reset the AI-generated comments, colors, and star ratings before the new analysis runs.
+
+* **Customizable Vocabulary:** Build a feature that allows users to edit the controlled vocabulary through a simple UI. This would give advanced users power over the AI's tag suggestions for `components`, `energy_vibe`, and other categories, tailoring the output to their specific needs.
+
+---
+### User Interface & Experience (UI/UX)
+
+These items focus on making the application more intuitive, informative, and powerful from the user's perspective.
+
+* **Configurable Tag Settings:** Enhance the frontend to allow users to configure key parameters for each run from the UI, such as the desired number of sub-genres or components to be generated.
+
+* **Informative Tooltips:** Add context-aware help icons (❔) to UI elements, starting with the "Clear Tags" checkbox. This will clearly explain each feature's function, what it does, and what it doesn't do (e.g., clarifying that Genres are always overwritten).
+
+* **Polished Dashboard UI:** Evolve the simple HTML page into a modern, card-based dashboard inspired by professional analytics tools. This would provide a more engaging and visually appealing experience for tracking job progress and viewing results.
+
+---
+### Long-Term Vision (V2.0)
+
+These are major architectural upgrades that would transform Tag Genius into a more powerful and interactive application.
+
+* **Stateful "Interactive Mode":** A significant evolution from a stateless utility to a stateful web app. This would introduce the "Load/Eject" workflow, allowing a user to upload a file once and perform multiple actions on it (tag, clear, re-tag with different settings) without needing to re-upload. This would require implementing server-side state management and a suite of new API endpoints.
+
+* **Advanced Calibration Profiles:** To further address the subjectivity of tagging, this feature would allow users to select a "Calibration Profile" (e.g., "Hard Techno & Industrial," "Deep & Melodic House," "Classic Funk/Soul"). This profile would apply a specially tuned AI prompt to the entire library run, calibrating the AI's output to the specific nuances of the user's taste without requiring them to split their library.
