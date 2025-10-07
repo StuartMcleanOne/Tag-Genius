@@ -38,8 +38,6 @@ LATEST_XML_PATH = None
 
 # --- CONSTANTS ---
 CONTROLLED_VOCABULARY = {
-    # High level primary genre "buckets"
-
     "primary_genre": [
         "House", "Techno", "Drum & Bass", "Breaks", "Trance", "Ambient/Downtempo",
         "Funk/Soul/Disco", "Hip Hop / Rap", "Reggae", "Jazz", "Blues", "Rock",
@@ -48,21 +46,19 @@ CONTROLLED_VOCABULARY = {
     # sub_genre list is removed for AI "Guided Discovery"
 
     "components": [
+        # Mix Types
         "Vocal", "Instrumental", "Acapella", "Remix", "Intro", "Extended", "Edit",
-        "Synth", "Bass", "Drums", "Percussion", "Piano", "Keys", "Guitar",
-        "Strings", "Orchestral", "Saxophone", "Trumpet", "Wind", "Brass"
+        # Specific Instruments
+        "Piano", "Keys", "Guitar", "Strings", "Orchestral", "Saxophone", "Trumpet", "Wind", "Brass"
     ],
-    # Tighter vibe list, removing overlaps.
-
     "energy_vibe": [
         "Aggressive", "Calm", "Dark", "Driving", "Energetic", "Funky",
         "Happy", "Hypnotic", "Mellow", "Romantic", "Soulful", "Uplifting"
     ],
-    # Removed club and festival to force Ai to present better information to DJ.
-
+    # Timing or environments
     "situation_environment": [
         "After-afterhours", "Afterhours", "Beach", "Closer", "Filler",
-        "Handoff", "Lounge", "Outro", "Party", "Peak Hour", "Pre-Party",
+        "Handoff", "Lounge", "Outro", "Peak Hour", "Pre-Party",
         "Sunset", "Warmup"
     ],
     "time_period": [
@@ -307,19 +303,19 @@ def call_llm_for_tags(track_data, config):
     time_period_list = ", ".join(CONTROLLED_VOCABULARY["time_period"])
 
     prompt_text = (
-        f"You are an expert musicologist. Your mission is to provide structured, consistent tags for a DJ's library.\n\n"
+        f"You are an expert musicologist specializing in electronic dance music. Your mission is to provide structured, consistent tags for a DJ's library.\n\n"
         f"Here is the track data:\n"
         f"Track: '{track_data.get('ARTIST')} - {track_data.get('TITLE')}'\n"
         f"Existing Genre: {track_data.get('GENRE')}\nYear: {track_data.get('YEAR')}\n\n"
         f"Please provide a JSON object with the following keys, following these specific instructions:\n\n"
         f"1. 'primary_genre': Choose EXACTLY ONE foundational genre from this list that best represents the track's core identity:\n"
         f"   {primary_genre_list}\n\n"
-        f"2. 'sub_genre': Now, using your expert knowledge, provide up to {config.get('sub_genre', 2)} specific and widely-recognized sub-genres for this track (e.g., 'French House', 'Liquid Drum & Bass', 'Delta Blues'). Do not invent obscure or overly granular genres. This field is for your expert discovery.\n\n"
-        f"3. 'energy_level': Provide a single integer from 1 (lowest energy) to 10 (highest energy).\n\n"
-        f"4. For the following categories, choose up to the specified number of tags from their respective lists:\n"
+        f"2. 'sub_genre': Using your expert knowledge, provide up to {config.get('sub_genre', 2)} specific and widely-recognized sub-genres for this track (e.g., 'French House', 'Liquid Drum & Bass'). Do not invent obscure genres.\n\n"
+        f"3. 'energy_level': Provide a single integer from 1 (lowest energy) to 10 (highest energy). IMPORTANT: Your rating should be calibrated for a DJ who plays electronic dance music. A '10/10' should represent the peak energy for a festival or club, not the absolute peak of all music genres.\n\n"
+        f"4. 'components': Identify up to {config.get('components', 3)} prominent musical elements. Prioritize specific instruments or mix types from this list: {components_list}. If you identify a specific synthesizer or drum machine (e.g., 'TB-303', '808 Drums'), you are encouraged to use that term. Avoid overly generic terms like 'Synth' or 'Drums'.\n\n"
+        f"5. For the remaining categories, choose up to the specified number of tags from their respective lists:\n"
         f"   - 'energy_vibe' (up to {config.get('energy_vibe', 2)}): {energy_vibe_list}\n"
         f"   - 'situation_environment' (up to {config.get('situation_environment', 2)}): {situation_environment_list}\n"
-        f"   - 'components' (up to {config.get('components', 3)}): {components_list}\n"
         f"   - 'time_period' (up to {config.get('time_period', 1)}): {time_period_list}\n\n"
         f"IMPORTANT: Your response MUST be a single, valid JSON object and nothing else."
     )
@@ -475,16 +471,14 @@ def process_library_task(input_path, output_path, config):
                         track_colour_hex = '0x00FFFF'  # Aqua (Coldest)
                         track_colour_name = "Aqua"
 
-                if track_colour_hex:
-                    track.set('Colour', track_colour_hex)
-                    print(f"Colour-coded track as {track_colour_name} based on energy: {energy_level}/10")
-                else:
-                    # If no energy level or colour was determined, remove any old colour attribute
-                    if 'Colour' in track.attrib:
-                        del track.attrib['Colour']
-
-            # Clear Grouping
-            if 'Grouping' in track.attrib: del track.attrib['Grouping']
+                    if track_colour_hex:
+                        track.set('Colour', track_colour_hex)
+                        track.set('Grouping', track_colour_name)
+                        print(f"Colour-coded track as {track_colour_name} based on energy: {energy_level}/10")
+                    else:
+                        # If no energy level or colour was determined, remove any old colour attribute
+                        if 'Colour' in track.attrib:
+                            del track.attrib['Colour']
 
             # ADDED: Logic for automatic star rating
             energy_level = generated_tags.get('energy_level')
