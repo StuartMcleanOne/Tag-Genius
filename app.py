@@ -13,7 +13,6 @@ from celery import Celery
 from contextlib import contextmanager
 from datetime import datetime
 
-
 # --- SETUP ---
 
 # Load environment variables from a .env file
@@ -71,16 +70,15 @@ CONTROLLED_VOCABULARY = {
 # --- DATABASE FUNCTIONS ---
 
 def get_db_connection():
-
     """Establishes and returns a connection to the SQLite database."""
 
     conn = sqlite3.connect('tag_genius.db')
     conn.row_factory = sqlite3.Row
     return conn
 
+
 @contextmanager
 def db_cursor():
-
     """ A context manager for handling database connections anc cursors. """
 
     conn = get_db_connection()
@@ -100,11 +98,8 @@ def db_cursor():
         conn.close()
 
 
-
-
 @app.cli.command('init-db')
 def init_db():
-
     """A Flask CLI command to initialize the database with all tables."""
 
     try:
@@ -113,64 +108,124 @@ def init_db():
             # Tracks Table.
 
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS tracks (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    artist TEXT,
-                    bpm REAL,
-                    track_key TEXT,
-                    genre TEXT,
-                    label TEXT,
-                    comments TEXT,
-                    grouping TEXT,
-                    tags_json TEXT
-                );
-            """)
+                           CREATE TABLE IF NOT EXISTS tracks
+                           (
+                               id
+                               INTEGER
+                               PRIMARY
+                               KEY
+                               AUTOINCREMENT,
+                               name
+                               TEXT
+                               NOT
+                               NULL,
+                               artist
+                               TEXT,
+                               bpm
+                               REAL,
+                               track_key
+                               TEXT,
+                               genre
+                               TEXT,
+                               label
+                               TEXT,
+                               comments
+                               TEXT,
+                               grouping
+                               TEXT,
+                               tags_json
+                               TEXT
+                           );
+                           """)
 
             # Tags Table.
 
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS tags (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL UNIQUE
-                );
-            """)
+                           CREATE TABLE IF NOT EXISTS tags
+                           (
+                               id
+                               INTEGER
+                               PRIMARY
+                               KEY
+                               AUTOINCREMENT,
+                               name
+                               TEXT
+                               NOT
+                               NULL
+                               UNIQUE
+                           );
+                           """)
 
             # Track_tags Link Table.
 
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS track_tags (
-                    track_id INTEGER,
-                    tag_id INTEGER,
-                    FOREIGN KEY (track_id) REFERENCES tracks (id),
-                    FOREIGN KEY (tag_id) REFERENCES tags (id),
-                    PRIMARY KEY (track_id, tag_id)
-                );
-            """)
+                           CREATE TABLE IF NOT EXISTS track_tags
+                           (
+                               track_id
+                               INTEGER,
+                               tag_id
+                               INTEGER,
+                               FOREIGN
+                               KEY
+                           (
+                               track_id
+                           ) REFERENCES tracks
+                           (
+                               id
+                           ),
+                               FOREIGN KEY
+                           (
+                               tag_id
+                           ) REFERENCES tags
+                           (
+                               id
+                           ),
+                               PRIMARY KEY
+                           (
+                               track_id,
+                               tag_id
+                           )
+                               );
+                           """)
 
             # The  processing_log table for conversation history.
 
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS processing_log (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    original_filename TEXT NOT NULL,
-                    input_file_path TEXT,
-                    output_file_path TEXT,
-                    track_count INTEGER,
-                    status TEXT NOT NULL
-                );
-            """)
+                           CREATE TABLE IF NOT EXISTS processing_log
+                           (
+                               id
+                               INTEGER
+                               PRIMARY
+                               KEY
+                               AUTOINCREMENT,
+                               timestamp
+                               DATETIME
+                               DEFAULT
+                               CURRENT_TIMESTAMP,
+                               original_filename
+                               TEXT
+                               NOT
+                               NULL,
+                               input_file_path
+                               TEXT,
+                               output_file_path
+                               TEXT,
+                               track_count
+                               INTEGER,
+                               status
+                               TEXT
+                               NOT
+                               NULL
+                           );
+                           """)
         print('Database with all tables initialized successfully.')
     except sqlite3.Error as e:
         print(f"Database initialisation failed: {e}")
 
 
-
 # --- EXTERNAL API FUNCTIONS ---
 
 def call_lexicon_api(artist, name):
-
     """Calls the local Lexicon DJ application API to get enriched track data."""
 
     api_url = 'http://localhost:48624/v1/search/tracks'
@@ -186,7 +241,6 @@ def call_lexicon_api(artist, name):
 
 
 def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grouping, tags_dict):
-
     """
     Inserts a track and its associated tags into the normalized database.
     - Adds the track to the 'tracks' table.
@@ -197,7 +251,7 @@ def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grou
     try:
         with db_cursor() as cursor:
 
-        # First, check for and insert the track, getting its ID
+            # First, check for and insert the track, getting its ID
 
             cursor.execute(
                 "SELECT id FROM tracks WHERE name = ? AND artist = ?", (name, artist)
@@ -241,12 +295,12 @@ def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grou
                     tag_id = tag_row['id']
                 else:
                     cursor.execute(
-                    "INSERT INTO tags (name) VALUES (?)", (tag_name,)
+                        "INSERT INTO tags (name) VALUES (?)", (tag_name,)
                     )
                     tag_id = cursor.lastrowid
 
                     cursor.execute(
-                    "INSERT INTO track_tags (track_id, tag_id) VALUES (?, ?)", (track_id, tag_id)
+                        "INSERT INTO track_tags (track_id, tag_id) VALUES (?, ?)", (track_id, tag_id)
                     )
 
             print(f"Successfully linked {len(all_tags)} tags for track ID {track_id}.")
@@ -254,8 +308,8 @@ def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grou
     except sqlite3.Error as e:
         print(f"Database error: {e}")
 
-def log_job_start(filename, input_path):
 
+def log_job_start(filename, input_path):
     """Creates a new entry in the processing_log table for a new job."""
 
     try:
@@ -271,8 +325,8 @@ def log_job_start(filename, input_path):
         print(f"Failed to create log entry: {e}")
         return None
 
-def log_job_end(log_id, status, track_count, output_path):
 
+def log_job_end(log_id, status, track_count, output_path):
     """ Updates a log entry with the final status and details of a completed job."""
 
     try:
@@ -285,8 +339,8 @@ def log_job_end(log_id, status, track_count, output_path):
     except sqlite3.Error as e:
         print(f"Failed to update log entry:{e}")
 
-def call_llm_for_tags(track_data, config):
 
+def call_llm_for_tags(track_data, config):
     """Calls the OpenAI API to generate tags, including a numerical energy level."""
 
     api_key = os.environ.get("OPENAI_API_KEY")
@@ -296,7 +350,6 @@ def call_llm_for_tags(track_data, config):
 
     # Dynamically build the prompt parts from our vocabulary
     primary_genre_list = ", ".join(CONTROLLED_VOCABULARY["primary_genre"])
-    # Note: sub_genre_list is no longer needed as the AI will generate these freely.
     components_list = ", ".join(CONTROLLED_VOCABULARY["components"])
     energy_vibe_list = ", ".join(CONTROLLED_VOCABULARY["energy_vibe"])
     situation_environment_list = ", ".join(CONTROLLED_VOCABULARY["situation_environment"])
@@ -311,7 +364,11 @@ def call_llm_for_tags(track_data, config):
         f"1. 'primary_genre': Choose EXACTLY ONE foundational genre from this list that best represents the track's core identity:\n"
         f"   {primary_genre_list}\n\n"
         f"2. 'sub_genre': Using your expert knowledge, provide up to {config.get('sub_genre', 2)} specific and widely-recognized sub-genres for this track (e.g., 'French House', 'Liquid Drum & Bass'). Do not invent obscure genres.\n\n"
-        f"3. 'energy_level': Provide a single integer from 1 (lowest energy) to 10 (highest energy). IMPORTANT: Your rating should be calibrated for a DJ who plays electronic dance music. A '10/10' should represent the peak energy for a festival or club, not the absolute peak of all music genres.\n\n"
+        f"3. 'energy_level': Provide a single integer from 1 (lowest energy) to 10 (highest energy). Your rating MUST be calibrated for a DJ who plays electronic dance music.\n"
+        f"   - A '10/10' is for the most intense, peak-time festival anthems (e.g., hard techno, big room house).\n"
+        f"   - A '1/10' or '2/10' is for very low-energy tracks, such as ambient, downtempo, or chill-out music suitable for the start of a warm-up set.\n"
+        f"   - Be decisive and use the full 1-10 scale to show the difference between genres. A classic house track might be a '7' or '8', while a driving techno track could be a '9'.\n"
+        f"   - IMPORTANT: Do not be afraid to use the 1, 2, or 3 ratings. Overrating a low-energy track is a significant error. If a track is ambient, chill, or very sparse, it should receive a low score.\n\n"
         f"4. 'components': Identify up to {config.get('components', 3)} prominent musical elements. Prioritize specific instruments or mix types from this list: {components_list}. If you identify a specific synthesizer or drum machine (e.g., 'TB-303', '808 Drums'), you are encouraged to use that term. Avoid overly generic terms like 'Synth' or 'Drums'.\n\n"
         f"5. For the remaining categories, choose up to the specified number of tags from their respective lists:\n"
         f"   - 'energy_vibe' (up to {config.get('energy_vibe', 2)}): {energy_vibe_list}\n"
@@ -328,15 +385,13 @@ def call_llm_for_tags(track_data, config):
         "response_format": {"type": "json_object"}
     }
 
-
-    # Logic for API retries
-
     max_retries = 5
     initial_delay = 2
     for attempt in range(max_retries):
         try:
             response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
-            response.raise_for_status()
+            response.raise_for_status()  # This will raise an HTTPError for bad responses (4xx or 5xx)
+
             text_part = response.json().get("choices", [{}])[0].get("message", {}).get("content")
             if text_part:
                 print(f"Successfully tagged: {track_data.get('ARTIST')} - {track_data.get('TITLE')}")
@@ -344,18 +399,26 @@ def call_llm_for_tags(track_data, config):
                 if isinstance(json_response.get('primary_genre'), str):
                     json_response['primary_genre'] = [json_response['primary_genre']]
                 return json_response
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 429:
-                delay = initial_delay * (2 ** attempt)
-                print(f"Rate limit hit. Retrying in {delay} seconds...")
-                time.sleep(delay)
-            else:
-                print(f"HTTP error occurred: {e}")
-                return {}
-        except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
-            print(f"An error occurred: {e}")
+
+        except requests.exceptions.RequestException as e:
+            delay = initial_delay * (2 ** attempt)
+            print(f"A network error occurred ('{type(e).__name__}'). Retrying in {delay} seconds...")
+            time.sleep(delay)
+
+        except json.JSONDecodeError as e:
+            # If the response is not valid JSON, retrying won't help. Fail immediately.
+            print(f"Error: Failed to decode JSON response from server. {e}")
             return {}
 
+    # This part is only reached if all retries in the loop fail
+    print(f"Max retries exceeded for track: {track_data.get('ARTIST')} - {track_data.get('TITLE')}")
+    return {}
+
+    # This part is only reached if all retries in the loop fail
+    print(f"Max retries exceeded for track: {track_data.get('ARTIST')} - {track_data.get('TITLE')}")
+    return {}
+
+    # This part is only reached if all retries in the loop fail
     print(f"Max retries exceeded for track: {track_data.get('ARTIST')} - {track_data.get('TITLE')}")
     return {}
 
@@ -374,16 +437,15 @@ def convert_energy_to_rating(energy_level):
     elif energy_level >= 2:
         return 102  # 2 Stars
     elif energy_level == 1:
-        return 51   # 1 Star
+        return 51  # 1 Star
     else:
-        return 0    # 0 Stars
+        return 0  # 0 Stars
 
 
 # --- CORE LOGIC ---
 
 @celery.task
 def process_library_task(input_path, output_path, config):
-
     """Orchestrates the entire tagging process, including colour-coding and star ratings as background celery task."""
 
     original_filename = os.path.basename(input_path)
@@ -406,6 +468,7 @@ def process_library_task(input_path, output_path, config):
 
             track_data = {'ARTIST': artist, 'TITLE': track_name, 'GENRE': track.get('Genre'), 'YEAR': track.get('Year')}
             generated_tags = call_llm_for_tags(track_data, config)
+
             if not generated_tags:
                 print("Skipping tag update due to empty AI response.")
                 continue
@@ -506,14 +569,15 @@ def process_library_task(input_path, output_path, config):
         print(f"An error occurred during processing: {e}")
         return {"error": f"Failed to process XML: {e}"}
 
+
 # --- FLASK ROUTES ---
 
 @app.route('/')
 def hello_ai():
-
     """A simple route to confirm the server is running."""
 
     return 'Hello, Ai!'
+
 
 @app.route('/upload_library', methods=['POST'])
 def upload_library():
@@ -531,7 +595,6 @@ def upload_library():
         return jsonify({"error": "Invalid config format"}), 400
 
     if file:
-
         # Get original filename and split it into name and extension.
         original_filename = file.filename
         name, ext = os.path.splitext(original_filename)
@@ -548,7 +611,7 @@ def upload_library():
         os.makedirs(upload_folder, exist_ok=True)
         os.makedirs(output_folder, exist_ok=True)
 
-        input_path =os.path.join(upload_folder, unique_input_filename)
+        input_path = os.path.join(upload_folder, unique_input_filename)
         output_path = os.path.join(output_folder, unique_output_filename)
 
         # Save the uploaded file with its new unique file name
@@ -564,10 +627,8 @@ def upload_library():
     return jsonify({"error": "Unknown error"}), 500
 
 
-
 @app.route('/export_xml', methods=['GET'])
 def export_xml():
-
     """Allows the user to download the most recently generated XML file."""
 
     global LATEST_XML_PATH
@@ -578,14 +639,13 @@ def export_xml():
 
 @app.route('/history', methods=['GET'])
 def get_history():
-
     """Retrieves the log of all past processing jobs."""
 
     try:
         with db_cursor() as cursor:
             logs = cursor.execute(
-            "SELECT * FROM processing_log ORDER BY timestamp DESC"
-        ).fetchall()
+                "SELECT * FROM processing_log ORDER BY timestamp DESC"
+            ).fetchall()
         # Convert the database rows to a list of dictionaries
         history_list = [dict(row) for row in logs]
         return jsonify(history_list)
@@ -593,9 +653,9 @@ def get_history():
         print(f"Database error in get_history: {e}")
         return jsonify({"error": "Failed to retrieve history"}), 500
 
+
 @app.route('/download_job/<int:job_id>', methods=['GET'])
 def download_job_package(job_id):
-
     """
     Finds a job by its ID, zips up its input and output files,
     and sends them to the user as a downloadable package.
@@ -641,7 +701,6 @@ def download_job_package(job_id):
 
 @app.route('/tracks', methods=['GET'])
 def get_tracks():
-
     """Retrieves all tracks from the local database."""
 
     try:
@@ -660,7 +719,6 @@ def get_tracks():
         return jsonify({"error": "Failed to retrieve tracks"}), 500
 
 
-
 @app.route('/tracks', methods=['POST'])
 def add_track():
     """Adds a new track to the database from a JSON payload."""
@@ -676,8 +734,7 @@ def add_track():
             )
             return jsonify({"message": "Track added successfully."}), 201
     except sqlite3.Error as e:
-            return jsonify({"error": str(e)}), 500
-
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/tracks/<int:track_id>', methods=['GET'])
@@ -697,7 +754,6 @@ def get_track(track_id):
             return jsonify(track_dict)
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 404
-
 
 
 @app.route('/tracks/<int:track_id>', methods=['PUT'])
@@ -740,7 +796,6 @@ def delete_track(track_id):
             return jsonify({"message": "Track deleted successfully"}), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
-
 
 
 if __name__ == '__main__':
