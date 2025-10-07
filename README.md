@@ -209,6 +209,30 @@ During the intensive testing and calibration phase, a repetitive and error-prone
 
 A new Flask CLI command, **`flask drop-tables`**, was created to programmatically delete all tables from the database. This was then combined with the existing `flask init-db` command into a single, one-line terminal command (`flask drop-tables && flask init-db`) to provide a complete, one-step reset of the development environment. This automated a crucial part of the testing workflow, increasing speed and reducing the potential for user error during a critical development phase.
 
+### Phase 11: Implementing a Flexible "Clear Tags" Feature
+
+With the core model calibrated, the next roadmap item was the "Clear Tags" feature. The initial plan was a simple pre-processing checkbox. However, a deeper UX discussion revealed the need for two distinct user workflows: a one-click "clear and re-tag" option for experimentation, and a "clear only" utility to simply clean a file without running the AI.
+
+Instead of building a separate UI for each, an elegant, consolidated solution was designed and implemented. A new "None" option was added to the "Tagging Detail Level" slider. This allowed the feature to work in two powerful modes using just a single checkbox:
+
+1.  **Clear and Re-tag:** A user checks the "Clear Tags" box and selects a detail level (e.g., "Recommended"). The backend first calls the `clear_ai_tags` function and then proceeds with the AI analysis, all in one seamless operation.
+2.  **Clear Only:** A user checks the "Clear Tags" box and selects the new "None" level. The backend clears the tags but then intelligently skips the time-consuming and costly AI call, immediately producing a cleaned XML file.
+
+This approach successfully implemented two features' worth of functionality with minimal changes to the UI and backend logic, showcasing an efficient and user-focused design.
+
+---
+### Phase 12: Final Calibration - Debugging the "Last Mile"
+
+After successfully implementing the "Clear Tags" feature, a final end-to-end test in Rekordbox revealed a frustrating and elusive visual bug. While the star ratings were being applied correctly, the corresponding colors—specifically the highest 'Pink' and lowest 'Aqua'—were not displaying in the software.
+
+This triggered an intense "last mile" debugging sprint. The investigation confirmed that the application's logic was sound and that the correct `Colour` attributes were being written to the output XML file. The problem was therefore isolated to how the target software, Rekordbox, was interpreting the standard hex color codes.
+
+It was hypothesized that Rekordbox used a specific, non-standard color palette. To solve this, a definitive diagnostic test was devised:
+1.  Several tracks were manually colored inside Rekordbox, one for each color in the palette.
+2.  The library was exported to an XML file, creating a "Rosetta Stone."
+3.  This file was inspected to reveal the exact, proprietary hex codes that this version of Rekordbox expected (e.g., `0xFF007F` for Pink, not the standard `0xFF00FF`).
+
+The color logic in `app.py` was updated with these definitive hex codes. A final test confirmed the solution: all colors now display perfectly in Rekordbox, synchronizing flawlessly with the AI-generated star ratings. This phase served as a critical lesson in the challenges of integrating with proprietary, closed-source software and the importance of data-driven debugging to solve the final 1% of a problem.
 
 ## Future Improvements (Roadmap)
 
