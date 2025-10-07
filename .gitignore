@@ -1,13 +1,17 @@
-# Environment Variables
-.env
-
 # SQLite Database
 tag_genius.db
 
-# Python Cache
+# Python
 __pycache__/
-venv/
 *.pyc
 
-# IDE/OS Files
+# macOS
 .DS_Store
+
+# Application Data
+uploads/
+outputs/
+
+# Environment
+.env
+venv/
