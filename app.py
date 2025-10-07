@@ -223,6 +223,22 @@ def init_db():
         print(f"Database initialisation failed: {e}")
 
 
+@app.cli.command('drop-tables')
+def drop_tables():
+    """Drops all tables from the database."""
+    try:
+        with db_cursor() as cursor:
+            print("Dropping all tables...")
+            # Drop tables in reverse order of creation to respect foreign keys
+            cursor.execute("DROP TABLE IF EXISTS track_tags")
+            cursor.execute("DROP TABLE IF EXISTS tags")
+            cursor.execute("DROP TABLE IF EXISTS tracks")
+            cursor.execute("DROP TABLE IF EXISTS processing_log")
+            # Add any other tables here in the future
+            print("All tables dropped successfully.")
+    except sqlite3.Error as e:
+        print(f"Failed to drop tables: {e}")
+
 # --- EXTERNAL API FUNCTIONS ---
 
 def call_lexicon_api(artist, name):
