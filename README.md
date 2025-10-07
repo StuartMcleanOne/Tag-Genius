@@ -104,6 +104,38 @@ Once all three services are running, you can open the index.html file in a web b
 
 This section outlines the major phases of the MVP's development.including challenges faced and the solutions implemented.
 
+### Project Genesis: The DJ's Tagging Dilemma (draft)
+
+The genesis of Tag Genius was a desire to solve a universal problem for DJs: the tedious, inconsistent, and time-consuming manual labor of tagging a digital music library. While this includes everything from genre to musical components, one of the most notoriously difficult and subjective aspects is quantifying a track's "energy level."
+
+A popular thread on the /r/DJs subreddit, titled "Identifying energy level," serves as a perfect case study for this specific challenge, highlighting the broader pain points that Tag Genius aims to solve across all metadata fields:
+
+The Limits of Intuition: The original poster and many commenters expressed frustration with relying solely on subjective "intuition" to build a coherent set. They were actively seeking a more systematic, data-driven approach, a problem that applies to both genre and energy.
+
+Oversimplified Metrics: Experienced DJs in the thread correctly pointed out that a simple metric like BPM is a poor indicator of true energy. This mirrors the broader problem of using simplistic tags (e.g., just "House") when more nuance is required.
+
+Time-Consuming Manual Systems: To solve these issues, DJs are forced to invent their own laborious, manual tagging systems for all metadata. Commenters described using star ratings, color-coding, and detailed comments to track everything—a process that takes hours to apply and maintain.
+
+These real-world challenges affirmed the core mission of Tag Genius: to provide a holistic, AI-driven solution. By generating a comprehensive set of tags—including foundational genres, specific sub-genres, musical components, and an objective energy_level—the project automates the entire manual process. The AI's ability to tackle the difficult "energy" problem is a key feature, but it's part of a larger goal: to deliver a consistently and intelligently tagged library with minimal user effort.
+
+---
+
+### Project Genesis: The DJ's Tagging Dilemma (draft)
+
+The genesis of Tag Genius was a desire to solve a universal problem for DJs: the tedious, inconsistent, and time-consuming manual labor of organizing a digital music library. In an era of endless digital music, DJs find their collections plagued by a host of metadata challenges that stifle creativity and make finding the right track at the right moment incredibly difficult.
+
+This core problem manifests in several "pain points" that were the direct inspiration for the project's features:
+
+Genre Chaos & Inconsistency: The most common frustration is the lack of a standardized genre system. Tracks are often mislabeled by online stores, tagged with hyper-specific or conflicting genres, or lack a genre tag altogether. This creates a disorganized library where similar-sounding tracks are impossible to group together reliably.
+
+Lack of Descriptive Richness: A single genre tag is rarely enough to capture a track's essence. DJs need deeper, more functional metadata to understand its texture, mood, and ideal use case. Information about musical elements (like a piano or vocal), the overall vibe (e.g., 'dark' vs. 'uplifting'), and the best time to play it (e.g., 'warmup' vs. 'peak hour') is often missing entirely.
+
+The Manual Labor Bottleneck: The only traditional solution to these problems is for the DJ to manually listen to every track and painstakingly enter their own tags. This is a monumental time sink that scales poorly with a growing library and takes valuable hours away from practicing the actual craft of mixing.
+
+Tag Genius was conceived as a holistic, AI-powered solution to this entire ecosystem of problems. By leveraging a large language model, it attacks each pain point directly: it standardizes genres using its "Guided Discovery" model, enriches each track with a full suite of descriptive tags for mood and components, and automates the entire process to eliminate the manual labor bottleneck. The inclusion of an objective energy_level is a key part of this, providing another layer of powerful, sortable data. The ultimate goal is to transform a chaotic library into a consistently and intelligently organized collection, empowering DJs to focus on their creativity.
+
+---
+
 ### Phase 1: Project Genesis & The "Flash Model" Crisis
 
 The project began with a clear and practical goal: to build an AI-powered tool to solve the "common pain point of disorganized and inconsistent track metadata" for DJs. The initial vision was to create a system that could parse a Rekordbox XML file and use AI to generate simplified, organized tags based on user preference.
@@ -155,6 +187,27 @@ Following the successful implementation of the asynchronous architecture, a full
 
 ### Phase 8: Fulfilling the "Conversation History" MVP Requirement
 To meet the final MVP requirement, a user-centric "Job Archiving" feature was designed and implemented. This feature interprets "Conversation History" as a tangible "before and after" snapshot of each processing job. The backend was updated to save unique, timestamped copies of both the input and output XML files, and the `processing_log` database table was modified to store the paths to this archive. A new API endpoint was created to allow the user to download these paired files as a `.zip` package, providing a robust rollback and comparison capability.
+
+### Phase 9: The Data-Driven Calibration Sprint
+
+With the core features in place, the project entered its final and most crucial stage before the MVP could be considered complete: **AI calibration**. While the initial energy scores were functional, they lacked the precision needed for a professional tool. A systematic, data-driven approach was required to refine the AI's performance and ensure the results were genuinely useful for a DJ.
+
+To achieve this, a three-step iterative process was established:
+
+1.  **Creating a "Ground Truth":** A small, diverse playlist of electronic music was manually rated by the user to create a "ground truth" dataset. This served as an expert's "answer key" against which the AI's performance could be quantitatively measured.
+
+2.  **Quantitative Analysis:** A custom Python script (`comparison_ratings.py`) was developed to compare the AI's ratings against the ground truth. This tool provided clear, immediate feedback on the model's accuracy, including metrics like **"Exact Match %"** and **"Average Difference"** in stars.
+
+3.  **Iterative Prompt Engineering:** The initial test revealed a clear "compression" bias—the AI was hesitant to use the low (1-2) and high (9-10) ends of the scale. Based on this data, the AI prompt was refined over two major cycles, with each change targeting a specific, observed weakness in the model's output.
+
+This process was a clear success. After the final prompt adjustment, the model's performance improved dramatically. **Exact matches increased from an initial 33% to over 52%, and the average difference fell to just 0.81 stars.** This marked the successful conclusion of the calibration sprint, resulting in a significantly more accurate and reliable model ready for the MVP.
+
+---
+### Phase 10: Enhancing the Development Workflow
+
+During the intensive testing and calibration phase, a repetitive and error-prone task was identified: the need to constantly reset the database to ensure clean test runs. To solve this and improve the developer experience, a new tool was added directly into the application's command-line interface.
+
+A new Flask CLI command, **`flask drop-tables`**, was created to programmatically delete all tables from the database. This was then combined with the existing `flask init-db` command into a single, one-line terminal command (`flask drop-tables && flask init-db`) to provide a complete, one-step reset of the development environment. This automated a crucial part of the testing workflow, increasing speed and reducing the potential for user error during a critical development phase.
 
 ## Future Improvements (Roadmap)
 
