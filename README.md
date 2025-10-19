@@ -257,6 +257,49 @@ These items focus on making the application more intuitive, informative, and pow
 * **Informative Tooltips:** Add context-aware help icons (❔) to UI elements, starting with the "Clear Tags" checkbox. This will clearly explain each feature's function, what it does, and what it doesn't do (e.g., clarifying that Genres are always overwritten).
 
 * **Polished Dashboard UI:** Evolve the simple HTML page into a modern, card-based dashboard inspired by professional analytics tools. This would provide a more engaging and visually appealing experience for tracking job progress and viewing results.
+---
+
+### Design Choice: Upgrading the Library Splitter with Intelligent Grouping
+
+**1. The Need: A Curated and Actionable Output**
+
+The "Library Splitter" feature was designed to transform a large, monolithic user library into smaller, manageable files. However, a successful feature isn't just about technical execution; it's about the quality and usability of the output. The need was not just for a list of files, but for a **clean, curated, and actionable workspace** that empowers the user, rather than overwhelming them.
+
+**2. The Problem: The "Genre Chaos" Conflict**
+
+After implementing the initial "fast-but-dumb" splitter, I identified a major design conflict: **the splitter's literal output was directly at odds with the application's core mission of intelligent grouping.**
+
+The initial version would produce a long, chaotic list of 20+ hyper-specific XML files (e.g., `Industrial.xml`, `Nu_Disco.xml`, `Indie_Folk.xml`). This simply recreated the "genre chaos" problem in a new format, forcing the user to manually make sense of a disorganized file dump. This was a critical UX failure.
+
+**3. The Solution: The Two-Stage "Sort & Group" Model**
+
+To solve this, I redesigned the backend logic to be a two-stage process that aligns with the project's core value of simplifying a user's library.
+
+* **Stage 1: Raw Sort.** The application first performs a fast, initial split, creating in-memory "piles" of tracks for every unique genre it finds.
+
+* **Stage 2: Intelligent Grouping.** After the raw sort, a new grouping layer is applied. This logic uses a master **`GENRE_MAP`** to consolidate the smaller, specific genres into the main, high-level "buckets" that align with the project's vision (e.g., "Electronic", "Hip Hop", "Rock"). For example, `Industrial`, `French House`, and `Nu_Disco` are all intelligently merged into a single `Electronic.xml` file.
+
+**4. The Outcome: A Transformed User Experience**
+
+This new model dramatically improves the user experience by transforming the output from a raw data dump into a clean, curated starting point.
+
+**Before (Disorganized Output):**
+* `Techno.xml`
+* `Hip_Hop.xml`
+* `Indie_Folk.xml`
+* `Industrial.xml`
+* `French_House.xml`
+* *(...and 15 others)*
+
+**After (Intelligently Grouped Output):**
+* `Electronic.xml`
+* `Hip Hop.xml`
+* `Rock.xml`
+* `Miscellaneous.xml`
+
+**5. Insights**
+
+This iteration was a crucial lesson in product design: a feature's success must be measured by how well it solves the *user's root problem*, not just by its technical function. By recognizing that the initial splitter failed to reduce complexity, I was able to pivot to a far superior design. The "Sort & Group" model now perfectly sets the stage for the future vision of genre-specific "Geniuses," creating a seamless and logical user journey from a chaotic library to a perfectly tagged collection.
 
 ---
 ### Long-Term Vision (V2.0)
@@ -266,3 +309,5 @@ These are major architectural upgrades that would transform Tag Genius into a mo
 * **Stateful "Interactive Mode":** A significant evolution from a stateless utility to a stateful web app. This would introduce the "Load/Eject" workflow, allowing a user to upload a file once and perform multiple actions on it (tag, clear, re-tag with different settings) without needing to re-upload. This would require implementing server-side state management and a suite of new API endpoints.
 
 * **Advanced Calibration Profiles:** To further address the subjectivity of tagging, this feature would allow users to select a "Calibration Profile" (e.g., "Hard Techno & Industrial," "Deep & Melodic House," "Classic Funk/Soul"). This profile would apply a specially tuned AI prompt to the entire library run, calibrating the AI's output to the specific nuances of the user's taste without requiring them to split their library.
+
+

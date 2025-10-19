@@ -68,6 +68,13 @@
             visibility: visible;
             opacity: 1;
         }
+        /* Style for the new results area */
+        #split-results-area {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+        }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
@@ -79,38 +86,40 @@
             </p>
         </div>
 
-        <div class="space-y-4">
-            <label for="tagging-level" class="block text-sm font-medium text-gray-700">Tagging Detail Level</label>
-            <div class="relative w-full">
-                <input type="range" id="tagging-level" min="0" max="3" value="2" class="w-full">
-                <div class="flex justify-between text-xs text-gray-500 mt-2">
-                    <div class="tooltip relative">
-                        <span>None</span>
-                        <span class="tooltip-text">Skips AI tagging. Use with "Clear Tags" for a cleaning-only utility.</span>
-                    </div>
-                    <div class="tooltip relative">
-                        <span>Essential</span>
-                        <span class="tooltip-text">Receive only the core tags like primary genre and overall vibe.</span>
-                    </div>
-                    <div class="tooltip relative">
-                        <span>Recommended</span>
-                        <span class="tooltip-text">Receive a balanced set of tags, including a few key sub-genres and moods.</span>
-                    </div>
-                    <div class="tooltip relative">
-                        <span>Detailed</span>
-                        <span class="tooltip-text">Generate a comprehensive list of tags, including multiple sub-genres, moods, and key components.</span>
+        <div id="main-controls">
+            <div class="space-y-4">
+                <label for="tagging-level" class="block text-sm font-medium text-gray-700">Tagging Detail Level</label>
+                <div class="relative w-full">
+                    <input type="range" id="tagging-level" min="0" max="3" value="2" class="w-full">
+                    <div class="flex justify-between text-xs text-gray-500 mt-2">
+                        <div class="tooltip relative">
+                            <span>None</span>
+                            <span class="tooltip-text">Skips AI tagging. Use with "Clear Tags" for a cleaning-only utility.</span>
+                        </div>
+                        <div class="tooltip relative">
+                            <span>Essential</span>
+                            <span class="tooltip-text">Receive only the one core tag per catagory.</span>
+                        </div>
+                        <div class="tooltip relative">
+                            <span>Recommended</span>
+                            <span class="tooltip-text">Receive a balanced set of 2 tags per catagory.</span>
+                        </div>
+                        <div class="tooltip relative">
+                            <span>Detailed</span>
+                            <span class="tooltip-text">Generate a comprehensive list of 3 tags per catagory.</span>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="relative flex items-start">
-            <div class="flex h-6 items-center">
-                <input id="clearTagsCheckbox" name="clear_tags" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600">
-            </div>
-            <div class="ml-3 text-sm leading-6">
-                <label for="clearTagsCheckbox" class="font-medium text-gray-900">Clear existing AI tags</label>
-                <p class="text-gray-500">Useful for re-processing a previously tagged file.</p>
+            <div class="relative flex items-start pt-6">
+                <div class="flex h-6 items-center">
+                    <input id="clearTagsCheckbox" name="clear_tags" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600">
+                </div>
+                <div class="ml-3 text-sm leading-6">
+                    <label for="clearTagsCheckbox" class="font-medium text-gray-900">Clear existing AI tags</label>
+                    <p class="text-gray-500">Useful for re-processing a previously tagged file.</p>
+                </div>
             </div>
         </div>
 
@@ -125,12 +134,24 @@
 
         <div id="status-message" class="text-center text-sm font-medium mt-4"></div>
 
+        <!-- NEW: This is where the results of the split will be displayed -->
+        <div id="split-results-area" class="hidden space-y-2">
+            <h3 class="text-lg font-semibold text-gray-800">Split Library Files:</h3>
+            <ul id="split-files-list" class="list-disc list-inside text-gray-600">
+                <!-- File links will be added here by JavaScript -->
+            </ul>
+        </div>
+
         <div class="flex justify-center space-x-4 mt-6">
+            <!-- NEW: Added a new button for the splitter -->
+            <button id="split-library-btn" class="px-6 py-3 bg-green-600 text-white font-semibold rounded-full shadow-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                Split Library
+            </button>
             <button id="start-tagging-btn" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-full shadow-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                Start Process
+                Start Tagging
             </button>
             <button id="export-btn" class="px-6 py-3 bg-gray-500 text-white font-semibold rounded-full shadow-md hover:bg-gray-600 hidden">
-                Export XML
+                Export Main XML
             </button>
         </div>
     </div>
@@ -142,9 +163,13 @@
         const exportBtn = document.getElementById('export-btn');
         const statusMessage = document.getElementById('status-message');
         const taggingLevelInput = document.getElementById('tagging-level');
-        let uploadedFile = null;
 
-        // --- Tagging Configurations ---
+        // NEW: Get references to new elements
+        const splitLibraryBtn = document.getElementById('split-library-btn');
+        const splitResultsArea = document.getElementById('split-results-area');
+        const splitFilesList = document.getElementById('split-files-list');
+
+        let uploadedFile = null;
 
         const tagConfigurations = {
             "0": { "level": "None" },
@@ -165,6 +190,7 @@
             if (uploadedFile) {
                 statusMessage.textContent = `File selected: ${uploadedFile.name}`;
                 startTaggingBtn.disabled = false;
+                splitLibraryBtn.disabled = false; // Enable split button
             }
         }
 
@@ -180,7 +206,7 @@
 
                         if (latestJob.status === 'Completed' || latestJob.status === 'Failed') {
                             clearInterval(interval);
-                            statusMessage.textContent = `Job ${latestJob.status}! Your file is ready.`;
+                            statusMessage.textContent = `Tagging job ${latestJob.status}! Your file is ready.`;
                             exportBtn.classList.remove('hidden');
                             startTaggingBtn.disabled = false;
                         }
@@ -192,28 +218,66 @@
             }, 5000);
         }
 
-        // --- Start Process Button Logic ---
+        // --- Initial Button States ---
         startTaggingBtn.disabled = true;
+        splitLibraryBtn.disabled = true;
+
+        // --- NEW: Split Library Button Logic ---
+        splitLibraryBtn.addEventListener('click', async () => {
+            if (!uploadedFile) { return; }
+
+            statusMessage.textContent = "Uploading and splitting library...";
+            splitLibraryBtn.disabled = true;
+            startTaggingBtn.disabled = true;
+            splitResultsArea.classList.add('hidden');
+            splitFilesList.innerHTML = '';
+
+            const formData = new FormData();
+            formData.append('file', uploadedFile);
+
+            try {
+                const response = await fetch('http://127.0.0.1:5001/split_library', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    statusMessage.textContent = result.message;
+                    splitResultsArea.classList.remove('hidden');
+                    result.files.forEach(filePath => {
+                        const li = document.createElement('li');
+                        // For now, we just display the name. In the future, this could be a download link.
+                        const fileName = filePath.split('/').pop().split('\\').pop();
+                        li.textContent = fileName;
+                        splitFilesList.appendChild(li);
+                    });
+                } else {
+                    statusMessage.textContent = `Failed to split library: ${result.error}`;
+                }
+            } catch (error) {
+                console.error('Split failed:', error);
+                statusMessage.textContent = 'Split failed. Is the server running?';
+            } finally {
+                // Re-enable buttons
+                splitLibraryBtn.disabled = false;
+                startTaggingBtn.disabled = false;
+            }
+        });
+
+        // --- Start Tagging Button Logic ---
         startTaggingBtn.addEventListener('click', async () => {
             if (!uploadedFile) { return; }
 
-            statusMessage.textContent = "Uploading and starting job...";
+            statusMessage.textContent = "Uploading and starting tagging job...";
             startTaggingBtn.disabled = true;
+            splitLibraryBtn.disabled = true;
             exportBtn.classList.add('hidden');
 
             const selectedLevel = taggingLevelInput.value;
             const config = tagConfigurations[selectedLevel];
-
-            // MODIFIED: Add the clear_tags flag to the config object
             config.clear_tags = document.getElementById('clearTagsCheckbox').checked;
-
-            // Also changed button text to "Start Process"
-            if (config.level === 'None' && config.clear_tags) {
-                startTaggingBtn.textContent = 'Clearing Tags...';
-            } else {
-                startTaggingBtn.textContent = 'Start Tagging';
-            }
-
 
             const formData = new FormData();
             formData.append('file', uploadedFile);
@@ -238,6 +302,8 @@
                 console.error('Upload failed:', error);
                 statusMessage.textContent = 'Upload failed. Is the server running?';
                 startTaggingBtn.disabled = false;
+            } finally {
+                splitLibraryBtn.disabled = false;
             }
         });
 
@@ -245,7 +311,7 @@
         exportBtn.addEventListener('click', async () => {
             statusMessage.textContent = "Exporting file...";
             try {
-                const response = await fetch('http://127.0.0.1:5001/export_xml');
+                const response = await fetch('http://12-7.0.0.1:5001/export_xml');
                 if (response.ok) {
                     const blob = await response.blob();
                     const url = window.URL.createObjectURL(blob);

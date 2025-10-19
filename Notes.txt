@@ -27,3 +27,7 @@ Detailed =
             timestamp
             where the database lives
             Upload and export
+
+
+            Be sure to move the new flask initialise command to the beginning of the readme file
+
