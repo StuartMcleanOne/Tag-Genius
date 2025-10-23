@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tag Genius - Action History</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-2xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-900">User Action History</h1>
+            <a href="index.html" class="text-sm text-blue-600 hover:underline">&larr; Back to Tag Genius</a>
+        </div>
+
+        <div id="loading-message" class="text-center text-gray-500">
+            Loading history...
+        </div>
+
+        <ul id="history-list" class="space-y-3">
+            <!-- History items will be added here by JavaScript -->
+        </ul>
+
+        <div id="error-message" class="hidden text-center text-red-600 mt-4">
+            Failed to load history.
+        </div>
+    </div>
+
+    <script>
+        // Get references to the HTML elements
+        const historyList = document.getElementById('history-list');
+        const loadingMessage = document.getElementById('loading-message');
+        const errorMessage = document.getElementById('error-message');
+
+        // Function to fetch and display the history
+        async function fetchAndDisplayHistory() {
+            try {
+                // Call the backend endpoint to get the action logs
+                const response = await fetch('http://127.0.0.1:5001/get_actions');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const actions = await response.json(); // Parse the JSON response
+
+                loadingMessage.classList.add('hidden'); // Hide loading message
+
+                if (actions.length === 0) {
+                    historyList.innerHTML = '<li class="text-gray-500">No actions logged yet.</li>';
+                    return;
+                }
+
+                // Clear any previous items (though unlikely needed on first load)
+                historyList.innerHTML = '';
+
+                // Loop through each action and create a list item
+                actions.forEach(action => {
+                    const li = document.createElement('li');
+                    li.className = 'p-3 bg-gray-50 rounded-lg text-sm';
+
+                    // Format the timestamp (basic ISO format for now)
+                    const timestamp = new Date(action.timestamp).toLocaleString();
+
+                    li.textContent = `[${timestamp}] ${action.description}`;
+                    historyList.appendChild(li);
+                });
+
+            } catch (error) {
+                console.error('Error fetching history:', error);
+                loadingMessage.classList.add('hidden'); // Hide loading
+                errorMessage.classList.remove('hidden'); // Show error
+            }
+        }
+
+        // Run the function when the page finishes loading
+        document.addEventListener('DOMContentLoaded', fetchAndDisplayHistory);
+    </script>
+</body>
+</html>
