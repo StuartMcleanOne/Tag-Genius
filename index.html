@@ -243,77 +243,53 @@
         splitLibraryBtn.disabled = true;
 
 // --- Split Library Button Logic ---
-        /**
-         * Handles the click event for the "Split Library" button.
-         * Orchestrates the two-step process: analyze, then split.
-         */
-        splitLibraryBtn.addEventListener('click', async () => {
-            if (!uploadedFile) return; // Guard clause if no file selected
-            logAction("User clicked 'Split Library'");
+/**
+ * Handles the click event for the "Split Library" button.
+ * Dispatches the job to the backend and starts polling for its status.
+ */
+splitLibraryBtn.addEventListener('click', async () => {
+    if (!uploadedFile) return; // Guard clause if no file selected
+    logAction("User clicked 'Split Library'");
 
-            // Set UI to processing state
-            statusMessage.textContent = "Analyzing library...";
-            splitLibraryBtn.disabled = true;
-            startTaggingBtn.disabled = true; // Disable both buttons
-            splitLibraryBtn.textContent = "Analyzing...";
-            splitResultsArea.classList.add('hidden'); // Ensure results are hidden
-            splitResultsList.innerHTML = '';
+    // Set UI to processing state
+    statusMessage.textContent = "Dispatching split job to the background...";
+    splitLibraryBtn.disabled = true;
+    startTaggingBtn.disabled = true;
+    splitLibraryBtn.textContent = "Splitting...";
+    splitResultsArea.classList.add('hidden');
+    splitResultsList.innerHTML = '';
 
-            const analyzeFormData = new FormData();
-            analyzeFormData.append('file', uploadedFile);
+    const formData = new FormData();
+    formData.append('file', uploadedFile);
 
-            try {
-                // Step 1: Call backend to analyze the library file quickly
-                const analyzeResponse = await fetch(`${API_BASE_URL}/analyze_library`, {
-                    method: 'POST',
-                    body: analyzeFormData,
-                });
-                const analyzeResult = await analyzeResponse.json();
-                if (!analyzeResponse.ok) throw new Error(analyzeResult.error || 'Analysis failed');
-
-                // Step 2: Update status message based on analysis
-                const untaggedCount = analyzeResult.untagged_count;
-                if (untaggedCount > 0) {
-                    statusMessage.textContent = `Heads up! Found ${untaggedCount} untagged tracks. AI will find genres. Splitting now...`;
-                } else {
-                    statusMessage.textContent = "Analysis complete. Splitting now... this will be fast!";
-                }
-
-                // Step 3: Call backend to perform the actual library split
-                const splitFormData = new FormData();
-                splitFormData.append('file', uploadedFile);
-
-                const splitResponse = await fetch(`${API_BASE_URL}/split_library`, {
-                    method: 'POST',
-                    body: splitFormData,
-                });
-                const splitResult = await splitResponse.json();
-                if (!splitResponse.ok) throw new Error(splitResult.error || 'Splitting failed');
-
-                // Step 4: Display the list of generated split files
-                displaySplitResults(splitResult.files);
-                statusMessage.textContent = "Library split successfully!";
-
-                // Get a clean, comma-separated list of just the filenames.
-                const fileNames = splitResult.files.map(f => f.split('/').pop()).join(', ');
-                // Create a more readable log message that includes the file count.
-                const logMessage = `Library split successfully. Generated ${splitResult.files.length} files: ${fileNames}`;
-                // Send the improved message to the logging endpoint.
-                logAction(logMessage);
-
-            } catch (error) {
-                // Display error message if analysis or split fails
-                statusMessage.textContent = `An error occurred: ${error.message}`;
-                logAction(`Split failed: ${error.message}`);
-            } finally {
-                // Reset UI state after completion or failure
-                if (uploadedFile) { // Re-enable buttons only if a file is still selected
-                    splitLibraryBtn.disabled = false;
-                    startTaggingBtn.disabled = false;
-                }
-                splitLibraryBtn.textContent = "Split Library"; // Reset button text
-            }
+    try {
+        // Call the new asynchronous endpoint
+        const response = await fetch(`${API_BASE_URL}/split_library`, {
+            method: 'POST',
+            body: formData,
         });
+        const result = await response.json();
+
+        if (response.status === 202 && result.job_id) {
+            statusMessage.textContent = result.message;
+            // Start polling for the split job's status using its new ID
+            pollSplitJobStatus(result.job_id);
+            logAction(`Split job started successfully with ID ${result.job_id}`);
+        } else {
+            throw new Error(result.error || 'Failed to start split job');
+        }
+
+    } catch (error) {
+        statusMessage.textContent = `An error occurred: ${error.message}`;
+        logAction(`Split failed to start: ${error.message}`);
+        // Reset UI state on failure
+        if (uploadedFile) {
+            splitLibraryBtn.disabled = false;
+            startTaggingBtn.disabled = false;
+        }
+        splitLibraryBtn.textContent = "Split Library";
+    }
+});
 
 // --- Start Tagging Button Logic (for the main originally uploaded file) ---
         /**
@@ -433,6 +409,68 @@
                 }
             }, 5000); // Poll frequency: every 5 seconds
         }
+
+// --- Polling Function for Split Job Status ---
+/**
+ * Periodically checks the backend for the status of a specific split job.
+ * @param {number} jobIdToTrack - The unique ID of the split job to poll.
+ */
+function pollSplitJobStatus(jobIdToTrack) {
+    // Clear any previous interval to prevent multiple polls
+    if (window.splitPollingIntervalId) {
+        clearInterval(window.splitPollingIntervalId);
+    }
+
+    window.splitPollingIntervalId = setInterval(async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/history`);
+            if (!response.ok) throw new Error('Failed to fetch history');
+            const history = await response.json();
+
+            if (history && history.length > 0) {
+                // Find the specific split job by its ID
+                const currentJob = history.find(job => job.id === jobIdToTrack);
+
+                if (currentJob) {
+                    statusMessage.textContent = `Splitting library... (Job status: ${currentJob.status})`;
+
+                    // Check if the job is finished
+                    if (currentJob.status === 'Completed' || currentJob.status === 'Failed') {
+                        clearInterval(window.splitPollingIntervalId); // Stop polling
+
+                        if (currentJob.status === 'Completed' && currentJob.result_data) {
+                            const files = JSON.parse(currentJob.result_data);
+                            displaySplitResults(files); // Display the files from the database
+                            statusMessage.textContent = "Library split successfully!";
+                            logAction(`Split job ${jobIdToTrack} completed successfully.`);
+                        } else {
+                            statusMessage.textContent = `Split job failed. Check logs for details.`;
+                            logAction(`Split job ${jobIdToTrack} failed.`);
+                        }
+                        // Re-enable buttons
+                        if (uploadedFile) {
+                            startTaggingBtn.disabled = false;
+                            splitLibraryBtn.disabled = false;
+                        }
+                        splitLibraryBtn.textContent = "Split Library";
+                    }
+                } else {
+                    statusMessage.textContent = `Waiting for split job ID #${jobIdToTrack} to appear...`;
+                }
+            }
+        } catch (error) {
+            console.error('Split polling error:', error);
+            statusMessage.textContent = `Polling failed: ${error.message}`;
+            clearInterval(window.splitPollingIntervalId);
+            // Re-enable buttons on polling failure
+            if (uploadedFile) {
+                startTaggingBtn.disabled = false;
+                splitLibraryBtn.disabled = false;
+            }
+            splitLibraryBtn.textContent = "Split Library";
+        }
+    }, 5000); // Poll frequency: every 5 seconds
+}
 
         // --- Export Button Logic ---
         /**

@@ -326,6 +326,97 @@ The final, superior architecture combines two key elements:
 The core AI function (`call_llm_for_tags`) was refactored to operate in two modes (`'full'` for tagging, `'genre_only'` for splitting). This ensures 100% logical consistency using a single "brain" and adheres to the DRY principle. The splitter uses the fast `'genre_only'` mode as an intelligent fallback for untagged tracks.
 
 #### **Dynamic AI-Powered Grouping:** 
+
 Instead of a static map, the splitter performs a two-stage process. First, it determines the specific genre for every track. Then, it makes a *single, fast AI call* (`get_genre_map_from_ai`) on the list of *unique* genres found, dynamically mapping them to the main `MAIN_GENRE_BUCKETS`.
 
-### **4. The Outcome & Insights:** This architecture successfully balances speed (by minimizing AI calls) and intelligence (by leveraging the AI for dynamic grouping). It eliminates the need for manual maintenance, ensures scalability, maintains perfect logical consistency, and delivers the desired clean, curated output. This iterative process highlighted the importance of rejecting flawed initial designs and persevering to find an elegant solution that aligns with core architectural principles and the user's needs.
+### **4. The Outcome & Insights:** 
+
+This architecture successfully balances speed (by minimizing AI calls) and intelligence (by leveraging the AI for dynamic grouping). It eliminates the need for manual maintenance, ensures scalability, maintains perfect logical consistency, and delivers the desired clean, curated output. This iterative process highlighted the importance of rejecting flawed initial designs and persevering to find an elegant solution that aligns with core architectural principles and the user's needs.
+
+---
+
+## Case Study: Re-architecting the Library Splitter for Scalability and Reliability
+
+### The Situation: A Feature on the Brink of Failure
+
+The "Intelligent Splitter" was a cornerstone feature of the Tag Genius MVP, designed to provide a crucial pre-processing step for users with large music libraries. The initial version was built as a **synchronous** function: the user would upload a file, and the Flask web server would perform the entire, multi-step process of analyzing, fetching data from the AI, grouping, and creating files before sending a response.
+
+While this worked for small, clean test files, a full-scale test with a large, messy library (~250 tracks, ~50 of which were untagged) revealed a critical failure. After several minutes of a frozen UI, the browser connection would **timeout**, killing the server-side process mid-operation. The feature was functionally unusable for its target audience.
+
+---
+
+### The Problem Analysis: Beyond the Bug, Questioning the Feature's Core Value
+
+The immediate technical diagnosis was clear: a long-running synchronous task was exceeding the server's timeout limit. However, a deeper, more critical product-level question was raised about the feature's fundamental value proposition.
+
+The core of this questioning was: **What is the point of a "fast" splitter if the results are useless, and if making the results useful makes it just as slow as the main tagging engine?**
+
+This pivotal moment of analysis, driven by a user-experience-first mindset, brought forth several key insights:
+
+* **The "Useless Result" Problem:** The previous attempt to make the splitter faster involved making its API calls less patient. This resulted in most tracks being incorrectly sorted into a "Miscellaneous" bucket, defeating the feature's purpose.
+
+
+* **The "Slow Triage" Problem:** Making the splitter more patient and accurate meant it was now bottlenecked by the same API rate limits as the main tagger. This called the entire pre-processing architecture into question.
+
+
+* **The User Experience Failure:** The most critical issue was the user experience. A frozen UI with no feedback for several minutes is a failed feature, regardless of the backend logic.
+
+This in-depth questioning clarified the true goal: the feature didn't need to be instantaneous, but it did need to be **reliable** in its results and **non-blocking** in its user experience.
+
+---
+
+### The Action: A Full Architectural Upgrade to an Asynchronous Model
+
+Based on this analysis, the decision was made to perform a full architectural upgrade, transforming the splitter from a simple synchronous function into a robust, asynchronous background job. This was executed in three distinct parts.
+
+#### 1. Database Enhancement
+
+The `processing_log` table was upgraded to support different job types. A new `job_type` column was added to distinguish between `'tagging'` and `'split'` jobs, and a `result_data` column was added to store the JSON output of a completed split (the list of generated file paths).
+
+#### 2. Backend Re-architecture
+
+The core logic of the splitter was moved from the main Flask route into a new, dedicated Celery task: `split_library_task`. The `/split_library` route was simplified to perform only three actions:
+
+
+1.  Save the uploaded file to a unique job folder.
+
+
+2.  Create a new job entry in the database with `job_type='split'`.
+
+
+3.  Dispatch the `split_library_task` to the background Celery worker, passing it the new `job_id`.
+
+Crucially, the route now immediately returns a `202 Accepted` status to the browser, along with the unique `job_id` for tracking.
+
+#### 3. Frontend Implementation
+
+The frontend JavaScript was updated to handle this new asynchronous workflow.
+
+
+1.  The `splitLibraryBtn` event listener was modified to no longer wait for a file list. Instead, it expects a `job_id` in the response.
+
+
+2.  A new, dedicated polling function, `pollSplitJobStatus`, was created. Upon receiving a `job_id`, this function begins periodically calling the `/history` endpoint to check the status of that specific job.
+
+
+3.  When the job's status changes to `'Completed'`, the poller retrieves the list of generated files from the `result_data` field and dynamically displays the results to the user.
+
+---
+
+### The Result: A Scalable and Professional User Experience
+
+The architectural upgrade was a complete success, transforming the feature from a brittle liability into a core asset of the application.
+
+
+* **No More Timeouts:** The splitter can now handle libraries of any size without crashing or timing out.
+
+
+* **Instant Feedback:** The user interface is now completely **non-blocking**. The user receives immediate confirmation that their job has started.
+
+
+* **Real-Time Progress:** The polling mechanism provides the user with live status updates, creating a transparent and professional experience.
+
+
+* **Architectural Consistency:** Both major features of the application now operate on the same robust, scalable, and asynchronous foundation.
+
+This process not only fixed a critical bug but also validated the project's core architecture and demonstrated the ability to pivot from a simple implementation to a more complex, professional solution based on user-centric analysis.

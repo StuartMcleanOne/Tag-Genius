@@ -327,19 +327,28 @@ To speed up testing, the manual three-terminal startup process was replaced. A n
  This sprint successfully transformed the application from a functional but brittle tool into a resilient and robust MVP, ready for final validation.
 
 ---
+### Phase 15: Final Architectural Upgrade - Asynchronous Splitter
+
+After successfully hardening the splitter against API failures, a final architectural flaw was identified during a full-scale test: the **synchronous** nature of the `/split_library` route caused the entire process to **timeout** and crash when processing a large, messy library. To solve this and complete the MVP, a major architectural upgrade was performed.
+
+* **Re-architecting for Asynchronous Processing:** The splitter's core logic was moved from the main Flask route into a new, dedicated background Celery task (`split_library_task`). This mirrors the robust, scalable architecture of the main tagging engine and eliminates the timeout issue entirely, ensuring the feature is reliable for libraries of any size.
+
+* **Database Schema Enhancement:** The `processing_log` table was upgraded to support multiple job types. A `job_type` column was added to differentiate between 'tagging' and 'split' jobs, and a `result_data` column was added to store the JSON output of a split job (the list of generated files).
+
+* **Implementing Frontend Polling:** A new, dedicated JavaScript polling function (`pollSplitJobStatus`) was created for the splitter. The UI is now fully non-blocking; it provides the user with instant feedback and real-time status updates by tracking the unique `job_id` of the split task, creating a professional and seamless user experience.
+
+This final upgrade aligns all major features of the application under a consistent, asynchronous, and scalable architecture, marking the successful completion of the core MVP.
+
+---
 
 ## Future Roadmap
 ### Architectural Upgrades (Immediate Priority)
 
-**Make the Library Splitter Asynchronous:** 
-
-The most critical next step is to move the splitter's logic into a background Celery task. This will solve the timeout issue, provide a non-blocking user experience, and allow for the implementation of a real-time progress indicator for split jobs. This involves creating a split_library_task, updating the database schema to store split job results, and adding a new polling mechanism to the frontend.
 
 ### Core Functionality (Next Steps)
 
 **Implement "Tag this File" Button:** Connect the UI to the backend to allow a user to send a newly created split file directly to the asynchronous tagging engine.
 
-**Customizable Vocabulary:** Build a feature that allows users to edit the controlled vocabulary through a simple UI, tailoring the AI's output to their specific needs.
 
 ## Long-Term Vision (V2.0)
 

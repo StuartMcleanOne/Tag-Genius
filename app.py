@@ -99,34 +99,39 @@ def init_db():
     try:
         with db_cursor() as cursor:
             # Tracks Table: Stores core track metadata and the full AI response JSON
+            # Processing_log Table: Tracks metadata about each job run
             cursor.execute("""
-                           CREATE TABLE IF NOT EXISTS tracks
+                           CREATE TABLE IF NOT EXISTS processing_log
                            (
                                id
                                INTEGER
                                PRIMARY
                                KEY
                                AUTOINCREMENT,
-                               name
+                               timestamp
+                               DATETIME
+                               DEFAULT
+                               CURRENT_TIMESTAMP,
+                               original_filename
                                TEXT
                                NOT
                                NULL,
-                               artist
+                               input_file_path
                                TEXT,
-                               bpm
-                               REAL,
-                               track_key
-                               TEXT,
-                               genre
-                               TEXT,
-                               label
-                               TEXT,
-                               comments
-                               TEXT,
-                               grouping
-                               TEXT,
-                               tags_json
+                               output_file_path
+                               TEXT, /* For tagging jobs */
+                               track_count
+                               INTEGER,
+                               status
                                TEXT
+                               NOT
+                               NULL,
+                               job_type
+                               TEXT
+                               NOT
+                               NULL, /* NEW: 'tagging' or 'split' */
+                               result_data
+                               TEXT /* NEW: Stores JSON result, like file list */
                            );
                            """)
             # Tags Table: Stores unique tag names across all categories
@@ -322,13 +327,13 @@ def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grou
         print(f"Database error in insert_track_data for {artist} - {name}: {e}")
 
 
-def log_job_start(filename, input_path):
+def log_job_start(filename, input_path, job_type):
     """Creates a new entry in the processing_log table for a new job."""
     try:
         with db_cursor() as cursor:
             cursor.execute(
-                "INSERT INTO processing_log (original_filename, input_file_path, status) VALUES (?, ?, ?)",
-                (filename, input_path, 'In Progress')
+                "INSERT INTO processing_log (original_filename, input_file_path, status, job_type) VALUES (?, ?, ?, ?)",
+                (filename, input_path, 'In Progress', job_type)
             )
             return cursor.lastrowid
     except sqlite3.Error as e:
@@ -422,7 +427,6 @@ def call_llm_for_tags(track_data, config, mode='full'):
             # Safely extract content from response
             text_part = response.json().get("choices", [{}])[0].get("message", {}).get("content")
             if text_part:
-                print(f"Successfully tagged (mode: {mode}): {artist} - {title}")  # Log original names
                 json_response = json.loads(text_part)
 
                 # Ensure primary_genre is always a list for consistent handling
@@ -431,7 +435,15 @@ def call_llm_for_tags(track_data, config, mode='full'):
                 elif not isinstance(json_response.get('primary_genre'), list):
                     json_response['primary_genre'] = ["Miscellaneous"]  # Default if missing/invalid
 
+                primary_genre_for_log = json_response['primary_genre'][0] if json_response['primary_genre'] else "N/A"
+
                 # Ensure sub_genre key exists for genre_only mode
+                if mode == 'full':
+                    print(f"Successfully tagged (mode: full): {artist} - {title}")
+                else:  # mode == 'genre_only'
+                    print(
+                        f"Successfully identified genre '{primary_genre_for_log}' for (mode: {mode}): {artist} - {title}")
+
                 if mode == 'genre_only' and 'sub_genre' not in json_response:
                     json_response['sub_genre'] = []
                 elif 'sub_genre' in json_response and not isinstance(json_response['sub_genre'], list):
@@ -609,7 +621,6 @@ def split_xml_by_genre(input_path, job_folder_path):
     Parses a Rekordbox XML, groups tracks by specific genres using intelligent fallback,
     then uses a dynamic AI call to group those into main buckets before saving files.
     """
-    print("--- DEFINITIVE V3 SPLITTER IS RUNNING ---")  # <-- ADD THIS LINE
     print(f"Starting split process for file: {input_path} into folder: {job_folder_path}")
     try:
         original_tree = ET.parse(input_path)
@@ -720,6 +731,39 @@ def clear_ai_tags(track_element):
     track_element.set('Rating', '0')
     return track_element  # Return modified element
 
+@celery.task
+def split_library_task(log_id, input_path, job_folder_path):
+    """
+    Celery task to orchestrate the library splitting process in the background.
+    This contains the logic from the old split_xml_by_genre function.
+    """
+    try:
+        # Core splitting logic remains the same.
+        # Runs safely in the background celery working preventing a timeout.
+        created_files = split_xml_by_genre(input_path, job_folder_path)
+
+        # After success, update the log with the results
+        outputs_base_path = os.path.abspath("outputs")
+        relative_paths = [os.path.relpath(p, start=outputs_base_path) for p in created_files]
+        result_json = json.dumps(relative_paths)
+
+        with db_cursor() as cursor:
+            cursor.execute(
+                "UPDATE processing_log SET status = ?, result_data = ?, track_count = ? WHERE id = ?",
+                ('Completed', result_json, len(created_files), log_id)
+            )
+        print(f"Split job {log_id} completed successfully.")
+        return {"message": "Split successful", "files": relative_paths}
+
+    except Exception as e:
+        # Log any failure as fatal
+        print(f"FATAL error during split job {log_id}: {e}")
+        with db_cursor() as cursor:
+            cursor.execute(
+                "UPDATE processing_log SET status = ? WHERE id = ?",
+                ('Failed', log_id)
+            )
+        return {"error": str(e)}
 
 @celery.task
 def process_library_task(log_id,input_path, output_path, config):
@@ -908,7 +952,7 @@ def upload_library():
             file.seek(0)  # Ensure pointer is at start before saving
             file.save(input_path)
 
-            log_id = log_job_start(original_filename,input_path)
+            log_id = log_job_start(original_filename,input_path, 'tagging')
             if not log_id:
                 return jsonify({"error": "Failed to create a job log entry. "}), 500
 
@@ -975,52 +1019,48 @@ def analyze_library():
 @app.route('/split_library', methods=['POST'])
 def split_library():
     """
-    Handles XML file upload, creates a job subfolder, calls the intelligent splitter,
-    and returns a list of the generated (grouped) file paths relative to 'outputs'.
+    Handles XML upload, creates a job log, and dispatches the splitting task
+    to a background Celery worker. Returns the job_id for polling.
     """
     if 'file' not in request.files: return jsonify({"error": "No file part"}), 400
     file = request.files['file']
     if not file or file.filename == '': return jsonify({"error": "No selected file"}), 400
 
     if file:
-        original_filename = file.filename
-        name, ext = os.path.splitext(original_filename)
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-
-        # Create unique subfolder within 'outputs'
-        job_folder_name = f"{timestamp}_{name}_split"
-        job_folder_path = os.path.join("outputs", job_folder_name)
-        os.makedirs(job_folder_path, exist_ok=True)
-
-        # Save original file inside job folder
-        input_path = os.path.join(job_folder_path, "original_library.xml")
         try:
-            file.seek(0)  # Ensure file pointer is at start
+            original_filename = file.filename
+            name, ext = os.path.splitext(original_filename)
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+            job_folder_name = f"{timestamp}_{name}_split"
+            job_folder_path = os.path.join("outputs", job_folder_name)
+            os.makedirs(job_folder_path, exist_ok=True)
+
+            input_path = os.path.join(job_folder_path, "original_library.xml")
+            file.seek(0)
             file.save(input_path)
 
-            print(f"Split job started for {original_filename}. Job folder: {job_folder_path}")
-            # Call the main splitting logic function
-            new_files_full_paths = split_xml_by_genre(input_path, job_folder_path)
+            # Create the unique ID log entry for the new 'split' job.
+            # Crucial for tracking its progress.
+            log_id = log_job_start(original_filename, input_path, 'split')
+            if not log_id:
+                return jsonify({"error": "Failed to create a job log entry."}), 500
 
-            # Convert absolute paths returned by split_xml_by_genre to paths
-            # relative to the 'outputs' directory for frontend consistency.
-            outputs_base_path = os.path.abspath("outputs")
-            relative_paths = [os.path.relpath(p, start=outputs_base_path) for p in new_files_full_paths]
+            # Dispatch background task with necessary info.
+            split_library_task.delay(log_id, input_path, job_folder_path)
 
-            print(f"Split job completed for {original_filename}. Generated files: {relative_paths}")
+            # Flask server is freed up to respond to user after handing off job to celery worker.
+            print(f"Split job dispatched with ID {log_id} for {original_filename}.")
+            # Return a success message and the new job's ID for polling
             return jsonify({
-                "message": "Library split successfully!",
-                "files": relative_paths,  # Send relative paths back
-            }), 200
+                "message": "Success! Your library is now being split in the background.",
+                "job_id": log_id
+            }), 202
 
         except Exception as e:
-            # Catch errors from file saving or the splitting function
-            print(f"Error during split_library processing for {original_filename}: {e}")
-            # import traceback # Uncomment for detailed stack trace
-            # print(traceback.format_exc())
-            return jsonify({"error": f"Failed to split library: {str(e)}"}), 500
+            print(f"Error during file save or split dispatch for {file.filename}: {e}")
+            return jsonify({"error": "Failed to save file or start processing task."}), 500
 
-    # Fallback error
     return jsonify({"error": "Unknown error during split request."}), 500
 
 
@@ -1076,9 +1116,10 @@ def get_history():
     """Retrieves the log of all past tagging/processing jobs."""
     try:
         with db_cursor() as cursor:
-            # Select columns relevant to job history display
+            # 'SELECT *' to ensure all columns are selected, including new ones.
+            # like job_type and result_data, are always fetched.
             logs = cursor.execute(
-                "SELECT id, timestamp, original_filename, track_count, status, output_file_path FROM processing_log ORDER BY timestamp DESC"
+                "SELECT * FROM processing_log ORDER BY timestamp DESC"
             ).fetchall()
         history_list = [dict(row) for row in logs]
         return jsonify(history_list)
@@ -1093,7 +1134,7 @@ def download_job_package(job_id):
     Finds a tagging job by ID, zips its original input and tagged output files,
     and sends the archive for download.
     """
-    input_path, output_path = None, None  # Initialize paths
+    input_path, output_path = None, None  # Initialize path
     original_filename = f"job_{job_id}_files"  # Default base name
     try:
         with db_cursor() as cursor:
