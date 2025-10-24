@@ -99,134 +99,62 @@ def init_db():
     try:
         with db_cursor() as cursor:
             # Tracks Table: Stores core track metadata and the full AI response JSON
-            # Processing_log Table: Tracks metadata about each job run
             cursor.execute("""
-                           CREATE TABLE IF NOT EXISTS processing_log
+                           CREATE TABLE IF NOT EXISTS tracks
                            (
-                               id
-                               INTEGER
-                               PRIMARY
-                               KEY
-                               AUTOINCREMENT,
-                               timestamp
-                               DATETIME
-                               DEFAULT
-                               CURRENT_TIMESTAMP,
-                               original_filename
-                               TEXT
-                               NOT
-                               NULL,
-                               input_file_path
-                               TEXT,
-                               output_file_path
-                               TEXT, /* For tagging jobs */
-                               track_count
-                               INTEGER,
-                               status
-                               TEXT
-                               NOT
-                               NULL,
-                               job_type
-                               TEXT
-                               NOT
-                               NULL, /* NEW: 'tagging' or 'split' */
-                               result_data
-                               TEXT /* NEW: Stores JSON result, like file list */
+                               id INTEGER PRIMARY KEY AUTOINCREMENT,
+                               name TEXT NOT NULL,
+                               artist TEXT,
+                               bpm REAL,
+                               track_key TEXT,
+                               genre TEXT,
+                               label TEXT,
+                               comments TEXT,
+                               grouping TEXT,
+                               tags_json TEXT
                            );
                            """)
             # Tags Table: Stores unique tag names across all categories
             cursor.execute("""
                            CREATE TABLE IF NOT EXISTS tags
                            (
-                               id
-                               INTEGER
-                               PRIMARY
-                               KEY
-                               AUTOINCREMENT,
-                               name
-                               TEXT
-                               NOT
-                               NULL
-                               UNIQUE
+                               id INTEGER PRIMARY KEY AUTOINCREMENT,
+                               name TEXT NOT NULL UNIQUE
                            );
                            """)
             # Track_tags Link Table: Many-to-many relationship between tracks and tags
             cursor.execute("""
                            CREATE TABLE IF NOT EXISTS track_tags
                            (
-                               track_id
-                               INTEGER,
-                               tag_id
-                               INTEGER,
-                               FOREIGN
-                               KEY
-                           (
-                               track_id
-                           ) REFERENCES tracks
-                           (
-                               id
-                           ) ON DELETE CASCADE,
-                               FOREIGN KEY
-                           (
-                               tag_id
-                           ) REFERENCES tags
-                           (
-                               id
-                           )
-                             ON DELETE CASCADE,
-                               PRIMARY KEY
-                           (
-                               track_id,
-                               tag_id
-                           )
-                               );
+                               track_id INTEGER,
+                               tag_id INTEGER,
+                               FOREIGN KEY (track_id) REFERENCES tracks (id) ON DELETE CASCADE,
+                               FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE,
+                               PRIMARY KEY (track_id, tag_id)
+                           );
                            """)
-            # Processing_log Table: Tracks metadata about each tagging/splitting job run
+            # Processing_log Table: Tracks metadata about each job run
             cursor.execute("""
                            CREATE TABLE IF NOT EXISTS processing_log
                            (
-                               id
-                               INTEGER
-                               PRIMARY
-                               KEY
-                               AUTOINCREMENT,
-                               timestamp
-                               DATETIME
-                               DEFAULT
-                               CURRENT_TIMESTAMP,
-                               original_filename
-                               TEXT
-                               NOT
-                               NULL,
-                               input_file_path
-                               TEXT,
-                               output_file_path
-                               TEXT,
-                               track_count
-                               INTEGER,
-                               status
-                               TEXT
-                               NOT
-                               NULL
+                               id INTEGER PRIMARY KEY AUTOINCREMENT,
+                               timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                               original_filename TEXT NOT NULL,
+                               input_file_path TEXT,
+                               output_file_path TEXT, /* For tagging jobs */
+                               track_count INTEGER,
+                               status TEXT NOT NULL,
+                               job_type TEXT NOT NULL, /* NEW: 'tagging' or 'split' */
+                               result_data TEXT /* NEW: Stores JSON result, like file list */
                            );
                            """)
             # User_actions Table: Logs simple user interactions for the history feature
             cursor.execute("""
                            CREATE TABLE IF NOT EXISTS user_actions
                            (
-                               id
-                               INTEGER
-                               PRIMARY
-                               KEY
-                               AUTOINCREMENT,
-                               timestamp
-                               DATETIME
-                               DEFAULT
-                               CURRENT_TIMESTAMP,
-                               action_description
-                               TEXT
-                               NOT
-                               NULL
+                               id INTEGER PRIMARY KEY AUTOINCREMENT,
+                               timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                               action_description TEXT NOT NULL
                            );
                            """)
         print('Database with all tables initialized successfully.')
@@ -395,12 +323,14 @@ def call_llm_for_tags(track_data, config, mode='full'):
             "3. 'energy_level': Integer 1-10, calibrated for electronic dance music DJs.",
             "   - Use 1-3 for low energy (ambient/chill). Do not overrate these.",
             "   - Use 9-10 only for peak-time anthems.",
-            f"4. 'components': Up to {config.get('components', 3)} from: [{components_list}]. Use specific synth/drum names if known (e.g., 'TB-303').",
-            "5. Additional tags (choose up to specified number):",
-            f"   - 'energy_vibe' (up to {config.get('energy_vibe', 2)}): [{energy_vibe_list}]",
-            f"   - 'situation_environment' (up to {config.get('situation_environment', 2)}): [{situation_environment_list}]",
-            f"   - 'time_period' (up to {config.get('time_period', 1)}): [{time_period_list}]"
+            f"""4. 'components': Identify up to {config.get('components', 3)} prominent musical elements from this list: [{components_list}].
+           - IMPORTANT: Do NOT list common elements like 'Drums' or 'Bass' unless they are the absolute main focus of the track.
+           - Focus on descriptive instruments like 'Piano', 'Strings', or 'Saxophone' that are useful for a DJ's search.""",
+            f"5. 'energy_vibe': Provide up to {config.get('energy_vibe', 2)} from: [{energy_vibe_list}]",
+            f"6. 'situation_environment': Provide up to {config.get('situation_environment', 2)} from: [{situation_environment_list}]",
+            f"7. 'time_period': Provide up to {config.get('time_period', 1)} from: [{time_period_list}]"
         ]
+
         prompt_parts.extend(full_mode_instructions)
 
     prompt_parts.append("\nResponse MUST be a single, valid JSON object.")
