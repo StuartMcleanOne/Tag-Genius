@@ -139,13 +139,14 @@ def init_db():
                            (
                                id INTEGER PRIMARY KEY AUTOINCREMENT,
                                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                               job_display_name TEXT, /* Human-readable name for UI */
                                original_filename TEXT NOT NULL,
                                input_file_path TEXT,
                                output_file_path TEXT, /* For tagging jobs */
                                track_count INTEGER,
                                status TEXT NOT NULL,
-                               job_type TEXT NOT NULL, /* NEW: 'tagging' or 'split' */
-                               result_data TEXT /* NEW: Stores JSON result, like file list */
+                               job_type TEXT NOT NULL,
+                               result_data TEXT
                            );
                            """)
             # User_actions Table: Logs simple user interactions for the history feature
@@ -160,7 +161,6 @@ def init_db():
         print('Database with all tables initialized successfully.')
     except sqlite3.Error as e:
         print(f"Database initialisation failed: {e}")
-
 
 @app.cli.command('drop-tables')
 def drop_tables():
@@ -255,13 +255,13 @@ def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grou
         print(f"Database error in insert_track_data for {artist} - {name}: {e}")
 
 
-def log_job_start(filename, input_path, job_type):
+def log_job_start(filename, input_path, job_type, job_display_name):
     """Creates a new entry in the processing_log table for a new job."""
     try:
         with db_cursor() as cursor:
             cursor.execute(
-                "INSERT INTO processing_log (original_filename, input_file_path, status, job_type) VALUES (?, ?, ?, ?)",
-                (filename, input_path, 'In Progress', job_type)
+                "INSERT INTO processing_log (original_filename, input_file_path, status, job_type, job_display_name) VALUES (?, ?, ?, ?, ?)",
+                (filename, input_path, 'In Progress', job_type, job_display_name)
             )
             return cursor.lastrowid
     except sqlite3.Error as e:
@@ -866,14 +866,22 @@ def upload_library():
         try:
             original_filename = file.filename
             name, ext = os.path.splitext(original_filename)
-            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+            # Get the current time once to use for all naming conventions
+            now = datetime.now()
+
+            # Create the machine-readable timestamp for unique filenames
+            timestamp = now.strftime("%Y%m%d-%H%M%S")
+
             # Create unique filenames
             unique_input_filename = f"{name}_{timestamp}{ext}"
             unique_output_filename = f"tagged_{name}_{timestamp}{ext}"
+
             # Define folders and ensure they exist
             upload_folder, output_folder = "uploads", "outputs"
             os.makedirs(upload_folder, exist_ok=True)
             os.makedirs(output_folder, exist_ok=True)
+
             # Construct full paths
             input_path = os.path.join(upload_folder, unique_input_filename)
             output_path = os.path.join(output_folder, unique_output_filename)
@@ -882,15 +890,21 @@ def upload_library():
             file.seek(0)  # Ensure pointer is at start before saving
             file.save(input_path)
 
-            log_id = log_job_start(original_filename,input_path, 'tagging')
-            if not log_id:
-                return jsonify({"error": "Failed to create a job log entry. "}), 500
+            # Create the human-readable display name for the UI
+            human_readable_time = now.strftime("%b %d, %I:%M %p")
+            detail_level = config.get('level', 'Unknown')
+            job_display_name = f"{name} - Tagging Job ({detail_level}) ({human_readable_time})"
 
+            log_id = log_job_start(original_filename, input_path, 'tagging', job_display_name)
+            if not log_id:
+                return jsonify({"error": "Failed to create a job log entry."}), 500
 
             # Dispatch the background task
-            process_library_task.delay(log_id,input_path, output_path, config)
+            process_library_task.delay(log_id, input_path, output_path, config)
             LATEST_XML_PATH = output_path  # Store path for potential export
+
             print(f"Tagging job dispatched with ID {log_id} for {original_filename}.")
+
             return jsonify({
                 "message": "Success! Your library is now being processed in the background.",
                 "job_id": log_id
@@ -902,6 +916,7 @@ def upload_library():
 
     # Fallback error (should not be reached)
     return jsonify({"error": "Unknown error during upload."}), 500
+
 
 
 @app.route('/analyze_library', methods=['POST'])
@@ -960,7 +975,12 @@ def split_library():
         try:
             original_filename = file.filename
             name, ext = os.path.splitext(original_filename)
-            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+            # Get the current time once to use for all naming conventions
+            now = datetime.now()
+
+            # Create the machine-readable timestamp for the unique folder name
+            timestamp = now.strftime("%Y%m%d-%H%M%S")
 
             job_folder_name = f"{timestamp}_{name}_split"
             job_folder_path = os.path.join("outputs", job_folder_name)
@@ -970,9 +990,13 @@ def split_library():
             file.seek(0)
             file.save(input_path)
 
+            # Create the human-readable display name for the UI
+            human_readable_time = now.strftime("%b %d, %I:%M %p")
+            job_display_name = f"{name} - Split Job ({human_readable_time})"
+
             # Create the unique ID log entry for the new 'split' job.
             # Crucial for tracking its progress.
-            log_id = log_job_start(original_filename, input_path, 'split')
+            log_id = log_job_start(original_filename, input_path, 'split', job_display_name)
             if not log_id:
                 return jsonify({"error": "Failed to create a job log entry."}), 500
 
@@ -981,6 +1005,7 @@ def split_library():
 
             # Flask server is freed up to respond to user after handing off job to celery worker.
             print(f"Split job dispatched with ID {log_id} for {original_filename}.")
+
             # Return a success message and the new job's ID for polling
             return jsonify({
                 "message": "Success! Your library is now being split in the background.",
@@ -992,6 +1017,66 @@ def split_library():
             return jsonify({"error": "Failed to save file or start processing task."}), 500
 
     return jsonify({"error": "Unknown error during split request."}), 500
+
+
+@app.route('/tag_split_file', methods=['POST'])
+def tag_split_file():
+    """
+    Receives a path to an existing split file and a config object,
+    then dispatches a tagging job for that specific file.
+    """
+    data = request.get_json()
+    if not data or 'file_path' not in data or 'config' not in data:
+        return jsonify({"error": "Missing file_path or config in request"}), 400
+
+    relative_file_path = data['file_path']
+    config = data['config']
+
+    # --- Security Check ---
+    # Ensure the requested path is safely within the 'outputs' directory
+    safe_base_path = os.path.abspath("outputs")
+    requested_path = os.path.abspath(os.path.join(safe_base_path, relative_file_path))
+    if not requested_path.startswith(safe_base_path) or not os.path.exists(requested_path):
+        return jsonify({"error": "Invalid or non-existent file path"}), 404
+    # --- End Security Check ---
+
+    try:
+        original_filename = os.path.basename(requested_path)
+        name, ext = os.path.splitext(original_filename)
+        now = datetime.now()
+        timestamp = now.strftime("%Y%m%d-%H%M%S")
+
+        # Define a new, unique output path for the tagged version of the split file
+        output_folder = "outputs"
+        unique_output_filename = f"tagged_{name}_{timestamp}{ext}"
+        output_path = os.path.join(output_folder, unique_output_filename)
+
+        # The existing split file is now the input for the tagging job.
+        input_path = requested_path
+
+        # Create the human-readable display name for the new tagging job.
+        human_readable_time = now.strftime("%b %d, %I:%M %p")
+        detail_level = config.get('level', 'Unknown')
+        job_display_name = f"{name} - Tagging Job ({detail_level}) ({human_readable_time})"
+
+        # Create a log entry for the new tagging job
+        log_id = log_job_start(original_filename, input_path, 'tagging', job_display_name)
+        if not log_id:
+            return jsonify({"error": "Failed to create a job log entry."}), 500
+
+        # Dispatch the existing process_library_task with the new paths and config
+        process_library_task.delay(log_id, input_path, output_path, config)
+
+        print(f"Tagging job for split file dispatched with ID {log_id}.")
+
+        return jsonify({
+            "message": f"Tagging job for {original_filename} started.",
+            "job_id": log_id
+        }), 202
+
+    except Exception as e:
+        print(f"Error dispatching tag job for split file: {e}")
+        return jsonify({"error": "Failed to start tagging task for the specified file."}), 500
 
 
 @app.route('/download_split_file', methods=['GET'])
