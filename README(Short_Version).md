@@ -30,41 +30,38 @@ The application uses a Flask backend, a multi-table SQLite database, and the Ope
 
 ## API Endpoints
 
-* **POST /upload_library:** The main endpoint for uploading an XML file and a configuration object. Kicks off the asynchronous tagging process and returns a 202 Accepted status.
-* **POST /split_library:** Splits an uploaded XML file into multiple, genre-specific XML files, creating an organized folder for the job.
-* **GET /history:** Retrieves a JSON list of all past processing jobs, ordered from newest to oldest. This is used by the frontend for status polling.
-* **GET /download_job/<int:job_id>:** Downloads a .zip package containing the archived "before" (original) and "after" (tagged) XML files for a specific job run.
-* **GET /download_split_file:** Downloads a single, specified file from a library split job.
-* **GET /export_xml:** Allows the user to download the most recently generated tagged XML file.
+---
+
+## API Endpoints
+
+* **`POST /upload_library`**: Kicks off the asynchronous tagging process for an uploaded file and returns a unique `job_id`.
+* **`POST /split_library`**: Kicks off the asynchronous splitting process for an uploaded file and returns a unique `job_id`.
+* **`POST /tag_split_file`**: Kicks off an asynchronous tagging job for a specific, pre-existing split file on the server.
+* **`GET /history`**: Retrieves a JSON list of all past processing jobs for status polling.
+* **`GET /download_job/<int:job_id>`**: Downloads a `.zip` archive containing the "before" and "after" files for a specific tagging job.
+* **`GET /download_split_file`**: Downloads a single, specified file from a library split job.
+* **`GET /export_xml`**: Downloads the most recently generated tagged XML file from a main tagging job.
+* **`POST /log_action`**: Logs a user interaction (e.g., a button click) to the database.
+* **`GET /get_actions`**: Retrieves the history of all logged user actions.
+
+---
 
 ## Setup and Installation
 
-1.  **Install Docker Desktop**: Download and install from the [official website](https://www.docker.com/products/docker-desktop/). This is required to run the Redis message broker.
-2.  **Clone the repository:**
-    ```bash
-    git clone <your-repo-url>
-    ```
-3.  **Create and activate a virtual environment:**
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
-4.  **Install dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-5.  **Create `.env` file:** Create a file named `.env` in the root directory and add your OpenAI API key:
-    ```
-    OPENAI_API_KEY='your_key_here'
-    ```
-6.  **Initialize the database:**
-    ```bash
-    flask init-db
-    ```
+1. Install Docker Desktop: Required to run the Redis message broker.
 
+2. Clone the repository.
+
+3. Create and activate a virtual environment: python3 -m venv venv and source venv/bin/activate.
+
+4. Install dependencies: pip install -r requirements.txt.
+
+5. Create .env file: Create a file named .env and add your OpenAI API key: OPENAI_API_KEY='your_key_here'.
+
+6. Make the Reset Script Executable: chmod +x reset_env.sh.
 ## How to Run the Application
 
-The application now runs as three separate services in three separate terminals. All commands should be run from the project's root directory.
+7. The application now runs as three separate services in three separate terminals. All commands should be run from the project's root directory.
 
 ### **Terminal 1: Start Redis**
 This command starts the Redis message broker using Docker.
@@ -167,3 +164,12 @@ With the core model calibrated, the **"Clear Tags"** feature was implemented. A 
 ### Phase 11: Integration Debugging & Color Correction
 
 A final end-to-end test in Rekordbox revealed a frustrating visual bug where some AI-assigned colors were not displaying correctly. This triggered an intense "last mile" debugging sprint. The problem was isolated to Rekordbox interpreting standard hex color codes incorrectly. To solve this, a definitive diagnostic test was devised: tracks were manually colored inside Rekordbox and the library was exported to create a **"Rosetta Stone,"** revealing the exact, proprietary hex codes the software expected (e.g., `0xFF007F` for Pink). The color logic was updated with these definitive hex codes, and a final test confirmed the solution.
+
+### Phase 12: Architecting the "Intelligent Splitter"
+With the core tagging engine calibrated, focus shifted to the "Library Splitter" feature. The development involved a significant architectural design process, moving from a "fast-but-dumb" initial version to a more robust model. After identifying a "Two Brains Problem" that created logical inconsistencies, the project pivoted to a definitive "One Brain, Two Modes" architecture. This refactored the main AI function to operate in 'full' or 'genre_only' mode, ensuring a single source of truth for all genre classification.
+
+### hase 13: Hardening the MVP - A Debugging & Refactoring Sprint
+End-to-end testing with a large, messy library revealed critical architectural issues. A focused debugging sprint was initiated to harden the application. This involved solving API grouping failures by implementing batch processing for the AI grouper, improving API resilience by making retry logic more "patient", fixing a critical polling loop bug by tracking a unique Job ID, and streamlining the development workflow with a new reset_env.sh script.
+
+### Phase 14: Final Architectural Upgrade - Asynchronous Splitter
+The final architectural flaw was identified during a full-scale test: the synchronous nature of the splitter caused the entire process to timeout and crash on large libraries. To solve this, a major upgrade was performed. The splitter's logic was moved into a dedicated background Celery task (split_library_task), the database schema was enhanced to handle multiple job types, and a new frontend polling function was implemented. This final upgrade aligns all major features under a consistent, asynchronous, and scalable architecture, marking the successful completion of the core MVP.

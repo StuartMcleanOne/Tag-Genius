@@ -340,6 +340,31 @@ After successfully hardening the splitter against API failures, a final architec
 This final upgrade aligns all major features of the application under a consistent, asynchronous, and scalable architecture, marking the successful completion of the core MVP.
 
 ---
+## Case Study: Solving the "Stateless UI" Problem with `sessionStorage`
+
+### The Problem: A Frustrating User Experience
+
+After successfully implementing the asynchronous Library Splitter, a significant user experience flaw was identified. The application's frontend was **stateless**. This meant that if the user refreshed the page or navigated to another section and came back, the list of successfully generated split files would disappear from the UI.
+
+This forced the user into a frustrating workflow: they would have to re-run the entire, time-consuming split process just to see the results again, even though the files were already saved on the server. This was an unacceptable user experience for a modern web application.
+
+---
+
+### The Solution: A Pragmatic Frontend State
+
+To solve this problem without adding complexity to the backend, a frontend-only solution was chosen using the browser's built-in **`sessionStorage`**. This acts as a temporary memory that persists for the duration of the browser tab session, perfectly matching the user's immediate need without over-engineering the backend for the MVP.
+
+The implementation was a simple two-step process:
+
+1.  **Saving State:** After a split job completes successfully, the JavaScript was updated to save the list of generated file paths as a JSON string into `sessionStorage`.
+2.  **Restoring State:** A new function, `restorePreviousState`, was created to run every time the page loads. This function checks `sessionStorage` for the saved file list. If it finds one, it immediately parses the data and uses the existing `displaySplitResults` function to restore the UI to its previous state.
+
+---
+
+### The Result: A Seamless and Intuitive Experience
+
+This quick and effective fix dramatically improves the user experience. The UI now "remembers" its last successful state within a session, allowing the user to freely navigate and refresh the page without losing their work. This demonstrates a practical, user-centric approach to solving a common web development challenge by choosing the right tool (`sessionStorage`) for a temporary, session-based problem.
+---
 
 ## Future Roadmap
 ### Architectural Upgrades (Immediate Priority)
@@ -347,7 +372,6 @@ This final upgrade aligns all major features of the application under a consiste
 
 ### Core Functionality (Next Steps)
 
-**Implement "Tag this File" Button:** Connect the UI to the backend to allow a user to send a newly created split file directly to the asynchronous tagging engine.
 
 
 ## Long-Term Vision (V2.0)

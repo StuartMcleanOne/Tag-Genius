@@ -383,6 +383,7 @@
                                     const files = JSON.parse(currentJob.result_data);
                                     displaySplitResults(files);
                                     statusMessage.textContent = `Job '${currentJob.job_display_name}' completed!`;
+                                    sessionStorage.setItem('lastSplitResults', currentJob.result_data);
                                     logAction(`Split job ${jobIdToTrack} completed successfully.`);
                                 } else {
                                     statusMessage.textContent = `Job '${currentJob.job_display_name}' failed. Check logs.`;
@@ -451,16 +452,32 @@
             }
         });
 
-        // --- Function to Fetch and Display Latest Split on Load (Placeholder) ---
-        async function fetchLatestSplitAndDisplay() {
-            console.log("Checking for previous split job on page load...");
-            try {
-                console.log("Feature to load previous split job on page refresh requires a new backend endpoint and is not implemented yet.");
-            } catch (error) {
-                console.error("Failed to fetch latest split on load:", error);
+/**
+         * Checks sessionStorage on page load to restore and display the results
+         * of the most recent split job from the current session.
+         */
+        function restorePreviousState() {
+            console.log("Checking for previous split job in session storage...");
+            const lastSplitResults = sessionStorage.getItem('lastSplitResults');
+
+            if (lastSplitResults) {
+                console.log("Found previous split results. Restoring UI.");
+                try {
+                    // Parse the JSON string back into an array of files
+                    const files = JSON.parse(lastSplitResults);
+                    // Use the existing function to display the results
+                    displaySplitResults(files);
+                    statusMessage.textContent = "Restored last successful library split.";
+                } catch (e) {
+                    console.error("Could not parse split results from sessionStorage", e);
+                    // If the data is corrupted, clear it out
+                    sessionStorage.removeItem('lastSplitResults');
+                }
             }
         }
-        document.addEventListener('DOMContentLoaded', fetchLatestSplitAndDisplay);
+
+        // Run the restore function when the page content is fully loaded
+        document.addEventListener('DOMContentLoaded', restorePreviousState);
     </script>
 </body>
 </html>

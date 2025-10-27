@@ -420,3 +420,58 @@ The architectural upgrade was a complete success, transforming the feature from 
 * **Architectural Consistency:** Both major features of the application now operate on the same robust, scalable, and asynchronous foundation.
 
 This process not only fixed a critical bug but also validated the project's core architecture and demonstrated the ability to pivot from a simple implementation to a more complex, professional solution based on user-centric analysis.
+
+
+## Case Study: Solving the "Stateless UI" Problem with `sessionStorage`
+
+### The Problem: A Frustrating User Experience
+
+After successfully implementing the asynchronous Library Splitter, a significant user experience flaw was identified. The application's frontend was **stateless**. This meant that if the user refreshed the page or navigated to another section and came back, the list of successfully generated split files would disappear from the UI.
+
+This forced the user into a frustrating workflow: they would have to re-run the entire, time-consuming split process just to see the results again, even though the files were already saved on the server. This was an unacceptable user experience for a modern web application.
+
+### The Solution: A Simple and Effective Frontend State
+
+To solve this problem without adding complexity to the backend, a frontend-only solution was chosen using the browser's built-in **`sessionStorage`**. This acts as a temporary memory that persists for the duration of the browser tab session.
+
+The implementation was a simple two-step process:
+1.  **Saving State:** After a split job completes successfully, the JavaScript now saves the list of generated file paths as a JSON string into `sessionStorage`.
+2.  **Restoring State:** When the page first loads, a new function (`restorePreviousState`) runs. It checks `sessionStorage` for the saved file list. If it finds one, it immediately parses the data and uses the existing `displaySplitResults` function to restore the UI to its previous state.
+
+### The Result: A Seamless and Intuitive Experience
+
+This quick and effective fix dramatically improves the user experience. The UI now "remembers" its last successful state within a session, allowing the user to freely navigate and refresh the page without losing their work. This demonstrates a practical, user-centric approach to solving a common web development challenge by choosing the right tool (`sessionStorage`) for a temporary, session-based problem.
+
+## UX Audit: Post-MVP Workflow Analysis
+
+After successfully implementing the asynchronous splitter and "Tag this File" functionality, a full end-to-end user test was conducted. This test revealed several critical user experience issues that result from the new, more complex application state.
+
+---
+
+### 1. State Management Conflict & Stale UI
+
+* **Observed Problem:** After a user splits a library, navigates away (e.g., to the Action History), and then returns, the UI correctly restores the split results with the message "Restored last successful library split." However, if the user then completes a *new* action (like tagging one of the split files), the UI status does not update to reflect this newer, more relevant job. It remains "stuck" on the older status.
+
+* **Analysis:** This is a direct result of the current `sessionStorage` implementation. It is only designed to save and restore the state of the *last split job*. It has no awareness of other job types. When the `restorePreviousState` function runs, it always finds the split data and overwrites the current UI state, creating a stale and misleading status message for the user.
+
+* **User Impact:** The user is confused about the status of their most recent action. The UI is not reflecting the true, current state of the application, which erodes trust.
+
+---
+
+### 2. UI Restoration Bug (Broken Download Buttons)
+
+* **Observed Problem:** When the UI state is restored from `sessionStorage` after a page refresh, the "Download" buttons for the split files no longer function. Clicking them does nothing; no download is initiated, and no error is shown.
+
+* **Analysis:** This points to a silent JavaScript error during the UI re-rendering process. While the `displaySplitResults` function correctly rebuilds the visual elements (the list items and buttons), an event listener or another necessary part of the JavaScript context is likely being lost or is not re-initialized correctly during the restoration from `sessionStorage`, breaking the button's functionality.
+
+* **User Impact:** A core feature becomes non-functional, breaking the user's workflow and preventing them from accessing their files.
+
+---
+
+### 3. Workflow Dead End & Ambiguity
+
+* **Observed Problem:** After a user successfully tags a specific split file (e.g., `Electronic.xml`), the UI provides no clear next step. The list of split files remains visible, and the "Download" button for `Electronic.xml` still points to the *original, untagged* version. There is no clear way to access the newly created tagged file.
+
+* **Analysis:** This is a fundamental gap in the user workflow design. The UI was designed to handle the **Split → Display Split Results** flow, but a corresponding flow for **Tag Split File → Display Tagged Result** was never implemented. The user is left in a state of ambiguity, unsure if the process worked and unable to access their final, desired output.
+
+* **User Impact:** The primary user goal (getting a tagged file) is not met, resulting in a complete workflow failure and a confusing dead-end experience.
