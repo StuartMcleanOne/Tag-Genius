@@ -14,6 +14,8 @@ from celery import Celery
 from contextlib import contextmanager
 from datetime import datetime
 
+
+
 # --- SETUP ---
 
 # Load environment variables from a .env file
@@ -67,6 +69,18 @@ MAIN_GENRE_BUCKETS = [
     "Electronic", "Hip Hop", "Rock", "Jazz-Funk-Soul", "World", "Pop", "Miscellaneous"
 ]
 
+# Master Blueprint Configuration
+# Defines the "detailed" settings used to create a master blueprint.
+
+MASTER_BLUEPRINT_CONFIG = {
+    "level": "Detailed",
+    "sub_genre": 3,
+    "energy_vibe": 3,
+    "situation_environment": 3,
+    "components": 3,
+    "time_period": 1
+}
+
 
 # --- DATABASE FUNCTIONS ---
 
@@ -106,7 +120,7 @@ def init_db():
                                name TEXT NOT NULL,
                                artist TEXT,
                                bpm REAL,
-                               track_key TEXT,
+                               tonality TEXT, /* CORRECTED: Was 'track_key' which is a reserved SQL keyword */
                                genre TEXT,
                                label TEXT,
                                comments TEXT,
@@ -178,10 +192,53 @@ def drop_tables():
     except sqlite3.Error as e:
         print(f"Failed to drop tables: {e}")
 
+def get_track_blueprint(name, artist):
+    """
+    Checks the database for an existing track and returns its 'tags_json' blueprint if found.
+    """
+    try:
+        with db_cursor() as cursor:
+            cursor.execute(
+                "SELECT tags_json FROM tracks WHERE name = ? AND artist = ?",
+                (name, artist)
+            )
+            result = cursor.fetchone()
+
+            # Check if a result was found and if tags_json is not None or empty
+            if result and result['tags_json']:
+                return json.loads(result['tags_json'])
+    except(sqlite3.Error, json.JSONDecodeError) as e:
+        print(f"Error retrieving or parsing blueprint for {artist} - {name}: {e}")
+    return None
+
+def apply_user_config_to_tags(blueprint_tags, user_config):
+    """
+    Trims the lists within a full tag blueprint to match the user's
+    selected detail level.
+    """
+
+    # Create a deep copy to avoid modifying the original blueprint dictionary
+    rendered_tags = json.loads(json.dumps(blueprint_tags))
+
+    # Define which keys in the tag dictionary are lists that should be trimmed.
+    list_keys_to_trim = ['sub_genre', 'components', 'energy_vibe', 'situation_environment', 'time_period']
+
+    for key in list_keys_to_trim:
+        # Check if the key exists in both the blueprint and the user's config.
+        if key in rendered_tags and key in user_config:
+            # Get the desired number of tags from the user's confi
+            num_tags_to_keep = user_config[key]
+            # Ensure the value is a list before slicing
+            if isinstance(rendered_tags[key], list):
+                # Slice the list to the desired length
+                rendered_tags[key] = rendered_tags[key][:num_tags_to_keep]
+
+    return rendered_tags
+
 
 # --- EXTERNAL API FUNCTIONS ---
 
-def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grouping, tags_dict):
+def insert_track_data(name, artist, bpm, tonality, genre, label, comments, grouping, tags_dict):
     """
     Inserts or updates track data and associated tags into the database.
     If track exists, updates; otherwise, inserts. Manages tags and links.
@@ -192,31 +249,35 @@ def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grou
             cursor.execute("SELECT id FROM tracks WHERE name = ? AND artist = ?", (name, artist))
             existing_track = cursor.fetchone()
 
-            tags_json_string = json.dumps(tags_dict)  # Convert tags dict to JSON string
+            # Only convert to string if tags_dict is not None
+            tags_json_string = json.dumps(tags_dict) if tags_dict is not None else None
 
             if existing_track:
                 track_id = existing_track['id']
                 print(f"Updating existing track: {name} by {artist} (ID: {track_id})")
-                cursor.execute(
-                    """UPDATE tracks
-                       SET bpm       = ?,
-                           track_key = ?,
-                           genre     = ?,
-                           label     = ?,
-                           comments  = ?,
-                           grouping  = ?,
-                           tags_json = ?
-                       WHERE id = ?""",
-                    (bpm, track_key, genre, label, comments, grouping, tags_json_string, track_id)
-                )
-                # Clear existing tags for this track before adding new ones
-                cursor.execute("DELETE FROM track_tags WHERE track_id = ?", (track_id,))
+
+                if tags_json_string is not None:
+                     cursor.execute(
+                        """UPDATE tracks
+                           SET bpm = ?, tonality = ?, genre = ?, label = ?,
+                               comments = ?, grouping = ?, tags_json = ?
+                           WHERE id = ?""",
+                        (bpm, tonality, genre, label, comments, grouping, tags_json_string, track_id)
+                    )
+                else:
+                    cursor.execute(
+                        """UPDATE tracks
+                           SET bpm = ?, tonality = ?, genre = ?, label = ?,
+                               comments = ?, grouping = ?
+                           WHERE id = ?""",
+                        (bpm, tonality, genre, label, comments, grouping, track_id)
+                    )
             else:
                 print(f"Inserting new track: {name} by {artist}")
                 cursor.execute(
-                    """INSERT INTO tracks (name, artist, bpm, track_key, genre, label, comments, grouping, tags_json)
+                    """INSERT INTO tracks (name, artist, bpm, tonality, genre, label, comments, grouping, tags_json)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (name, artist, bpm, track_key, genre, label, comments, grouping, tags_json_string)
+                    (name, artist, bpm, tonality, genre, label, comments, grouping, tags_json_string)
                 )
                 track_id = cursor.lastrowid
                 print(f"Successfully inserted track ID: {track_id}")
@@ -227,10 +288,9 @@ def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grou
                 for category_value in tags_dict.values():
                     if isinstance(category_value, list):
                         all_tags.update(t for t in category_value if
-                                        isinstance(t, str) and t.strip())  # Add non-empty strings from list
+                                        isinstance(t, str) and t.strip())
                     elif isinstance(category_value, str) and category_value.strip():
-                        all_tags.add(category_value.strip())  # Add non-empty string
-                    # Ignore other types like int (energy_level)
+                        all_tags.add(category_value.strip())
 
             # Insert tags and links
             tag_ids = []
@@ -249,11 +309,10 @@ def insert_track_data(name, artist, bpm, track_key, genre, label, comments, grou
                 cursor.executemany("INSERT OR IGNORE INTO track_tags (track_id, tag_id) VALUES (?, ?)",
                                    values_to_insert)
 
-            print(f"Successfully processed {len(all_tags)} tags for track ID {track_id}.")
+            print(f"Database record updated for track ID {track_id}.")
 
     except sqlite3.Error as e:
         print(f"Database error in insert_track_data for {artist} - {name}: {e}")
-
 
 def log_job_start(filename, input_path, job_type, job_display_name):
     """Creates a new entry in the processing_log table for a new job."""
@@ -267,7 +326,6 @@ def log_job_start(filename, input_path, job_type, job_display_name):
     except sqlite3.Error as e:
         print(f"Failed to create log entry for {filename}: {e}")
         return None
-
 
 def log_job_end(log_id, status, track_count, output_path):
     """ Updates a log entry with the final status and details of a completed job."""
@@ -342,7 +400,8 @@ def call_llm_for_tags(track_data, config, mode='full'):
     payload = {
         "model": "gpt-4o-mini",  # Consider making model configurable
         "messages": [{"role": "user", "content": prompt_text}],
-        "response_format": {"type": "json_object"}
+        "response_format": {"type": "json_object"},
+        "temperature": 0
     }
 
     # Implement exponential backoff for retries
@@ -696,9 +755,8 @@ def split_library_task(log_id, input_path, job_folder_path):
         return {"error": str(e)}
 
 @celery.task
-def process_library_task(log_id,input_path, output_path, config):
+def process_library_task(log_id, input_path, output_path, config):
     """Celery task to orchestrate the full tagging process for an XML file."""
-
     if not log_id:
         return {"error": "Failed to initialize logging for the job."}
 
@@ -717,112 +775,143 @@ def process_library_task(log_id,input_path, output_path, config):
             artist = track.get('Artist')
             print(f"\nProcessing track {index + 1}/{total_tracks}: {artist} - {track_name}")
 
-            # Optionally clear existing AI tags first
-            if config.get('clear_tags', False):
+            # --- NEW: Handle "Clear Tags" Mode ---
+            if config.get('level') == 'Clear':
                 clear_ai_tags(track)
                 print(f"Cleared existing AI tags for: {track_name}")
-
-            # Proceed with AI tagging only if level is not "None"
-            if config.get('level') != 'None':
-                track_data = {'ARTIST': artist, 'TITLE': track_name, 'GENRE': track.get('Genre'),
-                              'YEAR': track.get('Year')}
-                # Call AI in 'full' mode
-                generated_tags = call_llm_for_tags(track_data, config, mode='full')
-
-                # Validate response before proceeding
-                if not generated_tags or not generated_tags.get('primary_genre'):
-                    print("Skipping tag update due to empty or invalid AI response.")
-                    # Save track data even if AI fails, using existing/cleared values
-                    insert_track_data(track_name, artist, track.get('AverageBpm'), track.get('Tonality'),
-                                      track.get('Genre'), track.get('Label'), track.get('Comments'),
-                                      track.get('Grouping'), {})
-                    continue  # Move to next track
-
-                def ensure_list(value):
-                    if isinstance(value, str): return [value]
-                    if isinstance(value, list): return value
-                    return []
-
-                # Update XML Element with AI data
-                primary_genre = ensure_list(generated_tags.get('primary_genre'))
-                sub_genre = ensure_list(generated_tags.get('sub_genre'))
-                new_genre_string = ", ".join(g for g in primary_genre + sub_genre if g)  # Join non-empty genres
-                track.set('Genre',
-                          new_genre_string if new_genre_string else track.get('Genre', ''))  # Keep old if new is empty
-
-                # Format comments string
-                tag_order_and_prefixes = {'situation_environment': 'Sit', 'energy_vibe': 'Vibe',
-                                          'components': 'Comp', 'time_period': 'Time'}
-                formatted_parts = []
-                energy_level = generated_tags.get('energy_level')
-                if isinstance(energy_level, int):
-                    formatted_parts.append(f"E: {str(energy_level).zfill(2)}")
-                for key, prefix in tag_order_and_prefixes.items():
-                    tags = ensure_list(generated_tags.get(key))
-                    if tags:
-                        tag_string = ", ".join([t.strip().capitalize() for t in tags if t])  # Filter empty tags
-                        if tag_string: formatted_parts.append(f"{prefix}: {tag_string}")
-                final_comments_content = ' / '.join(formatted_parts)
-                final_comments = f"/* {final_comments_content} */" if final_comments_content else ""
-                track.set('Comments', final_comments)
-
-                # Set Colour, respecting Red override and using calibrated mapping
-                if track.get('Colour') != '0xFF0000':
-                    energy_level = generated_tags.get('energy_level')
-                    track_colour_hex, track_colour_name = None, None  # Use None instead of "None"
-                    if isinstance(energy_level, int):
-                        if energy_level >= 9:
-                            track_colour_hex, track_colour_name = '0xFF007F', "Pink"
-                        elif energy_level == 8:
-                            track_colour_hex, track_colour_name = '0xFFA500', "Orange"
-                        elif energy_level >= 6:
-                            track_colour_hex, track_colour_name = '0xFFFF00', "Yellow"
-                        elif energy_level >= 4:
-                            track_colour_hex, track_colour_name = '0x00FF00', "Green"
-                        else:
-                            track_colour_hex, track_colour_name = '0x25FDE9', "Aqua"
-
-                    if track_colour_hex:
-                        track.set('Colour', track_colour_hex)
-                        track.set('Grouping', track_colour_name)
-                        print(f"Colour-coded track as {track_colour_name} based on energy: {energy_level}/10")
-                    else:  # Remove attributes if no color assigned
-                        if 'Colour' in track.attrib: del track.attrib['Colour']
-                        if 'Grouping' in track.attrib: del track.attrib['Grouping']
-
-                # Set Star Rating using calibrated mapping
-                energy_level = generated_tags.get('energy_level')
-                rating_value = convert_energy_to_rating(energy_level) if energy_level is not None else 0
-                track.set('Rating', str(rating_value))
-                print(f"Assigned star rating based on energy level: {energy_level}/10 -> {rating_value}")
-
-                print(f"Updated XML for: {track_name}")
-                processed_count += 1
-
-                # Save to database (will update if exists)
-                insert_track_data(
-                    track_name, artist, track.get('AverageBpm'), track.get('Tonality'),
-                    new_genre_string if new_genre_string else track.get('Genre', ''),  # Pass potentially updated genre
-                    track.get('Label'), final_comments, track.get('Grouping'),  # Grouping might be None
-                    generated_tags
-                )
-
-            else:  # Handle "None" level (Clear Only workflow)
-                print(f"Skipped AI tagging for: {track_name} (Level: None)")
-                # Save cleared track data to the database
+                # Save the cleared track data to the database, preserving any existing blueprint
                 insert_track_data(
                     track_name, artist, track.get('AverageBpm'), track.get('Tonality'),
                     track.get('Genre'), track.get('Label'), track.get('Comments'), track.get('Grouping'),
-                    {}  # Pass empty dict for tags
+                    None  # Pass None to avoid overwriting an existing blueprint
                 )
-                processed_count += 1  # Count as processed even if only cleared
+                processed_count += 1
+                continue # Skip to the next track
 
-        # Ensure the COLLECTION 'Entries' count matches the number of tracks processed/kept
-        collection.set('Entries', str(len(collection.findall('TRACK'))))  # Recalculate based on final tracks in element
+            # --- Caching and Tagging Logic ---
+            full_blueprint_tags = None
+
+            # 1. --- CACHE CHECK ---
+            # Checks the database for a pre-existing blueprint for this track.
+            full_blueprint_tags = get_track_blueprint(track_name, artist)
+
+            if full_blueprint_tags:
+                # --- CACHE HIT ---
+                # If a blueprint is found, use it and skip the AI call.
+                print(f"CACHE HIT for: {track_name}. Using stored blueprint.")
+            else:
+                # --- CACHE MISS ---
+                # If no blueprint is found, call the AI to create a new one.
+                print(f"CACHE MISS for: {track_name}. Calling AI to create blueprint...")
+                track_data = {'ARTIST': artist, 'TITLE': track_name, 'GENRE': track.get('Genre'),
+                              'YEAR': track.get('Year')}
+                # Call AI using the hardcoded "Detailed" config to create the best blueprint
+                full_blueprint_tags = call_llm_for_tags(track_data, MASTER_BLUEPRINT_CONFIG, mode='full')
+
+            # Validate the blueprint before proceeding
+            if not full_blueprint_tags or not full_blueprint_tags.get('primary_genre'):
+                print("Skipping tag update due to empty or invalid blueprint.")
+                insert_track_data(
+                    track_name, artist, track.get('AverageBpm'), track.get('Tonality'),
+                    track.get('Genre'), track.get('Label'), track.get('Comments'),
+                    track.get('Grouping'), None
+                )
+                continue
+
+            # 2. --- DYNAMIC RENDERING ---
+            # Apply the user's selected detail level to the full blueprint to create a "working copy".
+            tags_for_xml = apply_user_config_to_tags(full_blueprint_tags, config)
+
+            # Clear existing tags before applying new ones to prevent conflicts
+            clear_ai_tags(track)
+
+            def ensure_list(value):
+                if isinstance(value, str): return [value]
+                if isinstance(value, list): return value
+                return []
+
+            # Update XML Element with the RENDERED data
+            primary_genre = ensure_list(tags_for_xml.get('primary_genre'))
+            sub_genre = ensure_list(tags_for_xml.get('sub_genre'))
+            new_genre_string = ", ".join(g for g in primary_genre + sub_genre if g)
+            track.set('Genre', new_genre_string if new_genre_string else track.get('Genre', ''))
+
+            # Format comments string
+            tag_order_and_prefixes = {'situation_environment': 'Sit', 'energy_vibe': 'Vibe',
+                                      'components': 'Comp', 'time_period': 'Time'}
+            formatted_parts = []
+            energy_level = tags_for_xml.get('energy_level')
+            if isinstance(energy_level, int):
+                formatted_parts.append(f"E: {str(energy_level).zfill(2)}")
+            for key, prefix in tag_order_and_prefixes.items():
+                tags = ensure_list(tags_for_xml.get(key))
+                if tags:
+                    tag_string = ", ".join([t.strip().capitalize() for t in tags if t]) # Filter empty tags
+                    if tag_string: formatted_parts.append(f"{prefix}: {tag_string}")
+            final_comments_content = ' / '.join(formatted_parts)
+            # Append to existing comments instead of overwriting
+            existing_comments = track.get('Comments', '').strip()
+            new_comments = f"/* {final_comments_content} */" if final_comments_content else ""
+            track.set('Comments', f"{existing_comments} {new_comments}".strip())
+
+
+            # Set Colour, respecting Red override
+            if track.get('Colour') != '0xFF0000':
+                energy_level = tags_for_xml.get('energy_level')
+                track_colour_hex, track_colour_name = None, None
+                if isinstance(energy_level, int):
+                    if energy_level >= 9:
+                        track_colour_hex, track_colour_name = '0xFF007F', "Pink"
+                    elif energy_level == 8:
+                        track_colour_hex, track_colour_name = '0xFFA500', "Orange"
+                    elif energy_level >= 6:
+                        track_colour_hex, track_colour_name = '0xFFFF00', "Yellow"
+                    elif energy_level >= 4:
+                        track_colour_hex, track_colour_name = '0x00FF00', "Green"
+                    else:
+                        track_colour_hex, track_colour_name = '0x25FDE9', "Aqua"
+                if track_colour_hex:
+                    track.set('Colour', track_colour_hex)
+                    track.set('Grouping', track_colour_name)
+                    print(f"Colour-coded track as {track_colour_name} based on energy: {energy_level}/10")
+                else:
+                    if 'Colour' in track.attrib: del track.attrib['Colour']
+                    if 'Grouping' in track.attrib: del track.attrib['Grouping']
+
+            # Set Star Rating
+            energy_level = tags_for_xml.get('energy_level')
+            rating_value = convert_energy_to_rating(energy_level) if energy_level is not None else 0
+            track.set('Rating', str(rating_value))
+            print(f"Assigned star rating based on energy level: {energy_level}/10 -> {rating_value}")
+
+            print(f"Updated XML for: {track_name}")
+
+            # Count and log tags actually written to the XML
+            rendered_tags_set = set()
+            for category_value in tags_for_xml.values():
+                if isinstance(category_value, list):
+                    rendered_tags_set.update(t for t in category_value if isinstance(t, str) and t.strip())
+                elif isinstance(category_value, str) and category_value.strip():
+                    rendered_tags_set.add(category_value.strip())
+            print(f"Wrote {len(rendered_tags_set)} tags to XML for this track.")
+
+            processed_count += 1
+
+            # 3. --- SAVE BLUEPRINT ---
+            # Save the FULL, UNTRIMMED blueprint to the database.
+            insert_track_data(
+                track_name, artist, track.get('AverageBpm'), track.get('Tonality'),
+                new_genre_string if new_genre_string else track.get('Genre', ''),
+                track.get('Label'), track.get('Comments'), track.get('Grouping'),
+                full_blueprint_tags  # Pass the full blueprint here
+            )
+
+        # Ensure the COLLECTION 'Entries' count matches the number of tracks
+        collection.set('Entries', str(len(collection.findall('TRACK'))))
 
         # Write the final modified XML tree
         tree.write(output_path, encoding='UTF-8', xml_declaration=True)
-        log_job_end(log_id, 'Completed', total_tracks, output_path)  # Log total tracks attempted
+        log_job_end(log_id, 'Completed', total_tracks, output_path)
         print(
             f"\nTagging process complete! {processed_count}/{total_tracks} tracks processed. New file saved at: {output_path}")
         return {"message": "Success! Your new library file is ready.", "filePath": output_path}

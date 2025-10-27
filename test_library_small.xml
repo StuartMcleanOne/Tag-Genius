@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DJ_PLAYLISTS Version="1.0.0">
+  <PRODUCT Name="rekordbox" Version="6.5.3" Company="AlphaTheta"/>
+  <COLLECTION Entries="5">
+    <TRACK TrackID="1" Name="Conjure Dreams" Artist="Maceo Plex" Genre="Techno" AverageBpm="124.00">
+      <LOCATION Dir="/Users/test/Music/" File="Maceo Plex - Conjure Dreams.mp3"/>
+    </TRACK>
+    <TRACK TrackID="2" Name="A New Error" Artist="Moderat" Genre="" AverageBpm="120.00">
+      <LOCATION Dir="/Users/test/Music/" File="Moderat - A New Error.mp3"/>
+    </TRACK>
+    <TRACK TrackID="3" Name="Can I Kick It?" Artist="A Tribe Called Quest" Genre="Hip Hop" AverageBpm="97.00">
+      <LOCATION Dir="/Users/test/Music/" File="A Tribe Called Quest - Can I Kick It.mp3"/>
+    </TRACK>
+    <TRACK TrackID="4" Name="Cirrus" Artist="Bonobo" Genre="Downtempo" AverageBpm="118.00" Colour="0xFF0000">
+      <LOCATION Dir="/Users/test/Music/" File="Bonobo - Cirrus.mp3"/>
+    </TRACK>
+    <TRACK TrackID="5" Name="One More Time" Artist="Daft Punk" Genre="House" AverageBpm="123.00">
+      <LOCATION Dir="/Users/test/Music/" File="Daft Punk - One More Time.mp3"/>
+    </TRACK>
+  </COLLECTION>
+</DJ_PLAYLISTS>

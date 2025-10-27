@@ -8,8 +8,7 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        .drag-area { border: 2px dashed #9ca3af; border-radius: 1re<div class="text-center relative">m; padding: 2rem; text-align: center; transition: all 0.2s ease; }
-        .drag-area.active { border-color: #3b82f6; background-color: #eff6ff; }
+        .drag-area { border: 2px dashed #9ca3af; border-radius: 1rem; padding: 2rem; text-align: center; transition: all 0.2s ease; }        .drag-area.active { border-color: #3b82f6; background-color: #eff6ff; }
         input[type="range"] { -webkit-appearance: none; width: 100%; height: 8px; background: #e5e7eb; border-radius: 5px; outline: none; transition: opacity .2s; }
         input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #1d4ed8; cursor: pointer; border-radius: 50%; border: 2px solid #fff; }
         input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; background: #1d4ed8; cursor: pointer; border-radius: 50%; border: 2px solid #fff; }
@@ -97,7 +96,6 @@
         const splitLibraryBtn = document.getElementById('split-library-btn');
         const splitResultsArea = document.getElementById('split-results-area');
         const splitResultsList = document.getElementById('split-results-list');
-        const clearTagsCheckbox = document.getElementById('clearTagsCheckbox');
 
         let uploadedFile = null; // Holds the currently selected file object
 
@@ -185,7 +183,7 @@
             splitLibraryBtn.disabled = true;
             const selectedLevel = taggingLevelInput.value;
             const config = { ...tagConfigurations[selectedLevel] };
-            config.clear_tags = clearTagsCheckbox.checked;
+
 
             try {
                 const response = await fetch(`${API_BASE_URL}/tag_split_file`, {
@@ -276,7 +274,6 @@
             splitResultsList.innerHTML = '';
             const selectedLevel = taggingLevelInput.value;
             const config = { ...tagConfigurations[selectedLevel] };
-            config.clear_tags = clearTagsCheckbox.checked;
             const formData = new FormData();
             formData.append('file', uploadedFile);
             formData.append('config', JSON.stringify(config));
