@@ -8,7 +8,7 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        .drag-area { border: 2px dashed #9ca3af; border-radius: 1rem; padding: 2rem; text-align: center; transition: all 0.2s ease; }
+        .drag-area { border: 2px dashed #9ca3af; border-radius: 1re<div class="text-center relative">m; padding: 2rem; text-align: center; transition: all 0.2s ease; }
         .drag-area.active { border-color: #3b82f6; background-color: #eff6ff; }
         input[type="range"] { -webkit-appearance: none; width: 100%; height: 8px; background: #e5e7eb; border-radius: 5px; outline: none; transition: opacity .2s; }
         input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #1d4ed8; cursor: pointer; border-radius: 50%; border: 2px solid #fff; }
@@ -22,9 +22,6 @@
     <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-lg space-y-6">
         <div class="text-center relative">
             <h1 class="text-3xl font-bold text-gray-900">Tag Genius</h1>
-            <p class="text-gray-500 mt-2">Upload your Rekordbox XML to get started.</p>
-            <!-- Link to History Page -->
-            <a href="history.html" class="absolute top-0 right-0 text-sm text-blue-600 hover:underline">View Action History</a>
         </div>
 
         <div id="main-controls">
@@ -33,9 +30,9 @@
                 <div class="relative w-full">
                     <input type="range" id="tagging-level" min="0" max="3" value="2" class="w-full">
                     <div class="flex justify-between text-xs text-gray-500 mt-2">
-                         <div class="tooltip relative">
-                            <span>None</span>
-                            <span class="tooltip-text">Skips AI tagging. Use with "Clear Tags" for a cleaning-only utility.</span>
+                        <div class="tooltip relative">
+                            <span>Clear Tags</span>
+                            <span class="tooltip-text">Clears all AI-generated tags from the file. Does not use the AI.</span>
                         </div>
                         <div class="tooltip relative">
                             <span>Essential</span>
@@ -52,21 +49,11 @@
                     </div>
                 </div>
             </div>
-
-            <div class="relative flex items-start pt-6">
-                <div class="flex h-6 items-center">
-                    <input id="clearTagsCheckbox" name="clear_tags" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600">
-                </div>
-                <div class="ml-3 text-sm leading-6">
-                    <label for="clearTagsCheckbox" class="font-medium text-gray-900">Clear existing AI tags</label>
-                    <p class="text-gray-500">Useful for re-processing a previously tagged file.</p>
-                </div>
-            </div>
         </div>
 
         <div id="drag-area" class="drag-area">
-            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                <path d="M28 8H12a2 2 0 00-2 2v20m30-20L28 8m0 0l4 4m-4-4V24m-12 8a2 2 0 01-2-2V8a2 2 0 012-2h12.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V28a2 2 0 01-2 2h-2m-3 8a2 2 0 002 2h4a2 2 0 002-2v-4m-6 4a2 2 0 01-2-2v-4a2 2 0 012-2h4a2 2 0 012 2v4a2 2 0 01-2 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
             </svg>
             <p class="mt-2 text-sm text-gray-600">Drag & drop your XML file here</p>
             <p class="text-xs text-gray-500 mt-1">or click to browse</p>
@@ -84,11 +71,14 @@
         </div>
 
         <div class="flex justify-center space-x-4 mt-6">
+            <a href="history.html" id="view-log-btn" class="px-6 py-3 bg-gray-600 text-white font-semibold rounded-full shadow-md hover:bg-gray-700">
+                View Log
+            </a>
             <button id="split-library-btn" class="px-6 py-3 bg-green-600 text-white font-semibold rounded-full shadow-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">
                 Split Library
             </button>
             <button id="start-tagging-btn" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-full shadow-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                Start Tagging
+                Run Genius
             </button>
             <button id="export-btn" class="px-6 py-3 bg-gray-500 text-white font-semibold rounded-full shadow-md hover:bg-gray-600 hidden">
                 Export Main XML
@@ -113,7 +103,7 @@
 
         // --- Configuration ---
         const tagConfigurations = {
-            "0": { "level": "None" },
+            "0": { "level": "Clear" },
             "1": { "level": "Essential", "sub_genre": 1, "energy_vibe": 1, "situation_environment": 1, "components": 1, "time_period": 1 },
             "2": { "level": "Recommended", "sub_genre": 2, "energy_vibe": 2, "situation_environment": 2, "components": 2, "time_period": 1 },
             "3": { "level": "Detailed", "sub_genre": 3, "energy_vibe": 3, "situation_environment": 3, "components": 3, "time_period": 1 }
