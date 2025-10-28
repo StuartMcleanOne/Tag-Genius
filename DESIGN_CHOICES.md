@@ -475,3 +475,29 @@ After successfully implementing the asynchronous splitter and "Tag this File" fu
 * **Analysis:** This is a fundamental gap in the user workflow design. The UI was designed to handle the **Split → Display Split Results** flow, but a corresponding flow for **Tag Split File → Display Tagged Result** was never implemented. The user is left in a state of ambiguity, unsure if the process worked and unable to access their final, desired output.
 
 * **User Impact:** The primary user goal (getting a tagged file) is not met, resulting in a complete workflow failure and a confusing dead-end experience.
+
+
+---
+
+## Design Choice: Refining the UI for the Master Blueprint Feature
+
+### 1. The Problem: A Flawed and Ambiguous User Experience
+
+After designing the "Master Blueprint" caching system, the user interface required an update. The old UI, which combined a "Tagging Detail Level" slider (with a "None" option) and a separate "Clear existing AI tags" checkbox, was no longer suitable.
+
+My initial attempt to simplify it—by just removing the "None" option—created a critical UX flaw. With the "None" level gone, the "Start Tagging" button would **always** run the AI. This meant a user could no longer perform a "Clear Only" operation; checking the box would only ever result in "Clear and Re-tag," destroying a key piece of utility.
+
+### 2. The Design Debate: Moving Beyond Ambiguity
+
+A proposal was made to solve this by creating a separate "Clear Tags" button alongside the "Split" and "Run" buttons. However, upon review, I identified that this solution created a new form of ambiguity. A user could have the slider set to "Recommended" but click the separate "Clear Tags" button, leading to uncertainty: "Will this clear *then* tag? Does the button's action override the slider's setting?" This was an unacceptable level of confusion for the user.
+
+### 3. The Final Design: The "Mode of Operation" Selector
+
+Based on this analysis, I rejected the multi-button layout and pivoted to a superior, unambiguous design. The core insight was to force the user to make **one single, definitive choice**.
+
+The solution was to transform the slider from a simple "detail level" control into a comprehensive **"Mode of Operation" selector**.
+
+* **The Control:** The slider was reconfigured with four distinct modes: **`Clear Tags | Essential | Recommended | Detailed`**. "Clear Tags" is now the most basic mode of the primary operation.
+* **The Action:** The main button was renamed to a more neutral **"Run"**. Its sole job is to execute whichever mode is currently selected on the slider.
+
+This "gear shift" design completely eliminates user uncertainty. There is zero ambiguity about what will happen when the "Run" button is clicked, creating a cleaner, more intuitive, and professional user experience that perfectly complements the new backend architecture.

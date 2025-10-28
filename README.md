@@ -327,7 +327,7 @@ To speed up testing, the manual three-terminal startup process was replaced. A n
  This sprint successfully transformed the application from a functional but brittle tool into a resilient and robust MVP, ready for final validation.
 
 ---
-### Phase 15: Final Architectural Upgrade - Asynchronous Splitter
+### Phase 15: Architectural Upgrade - Asynchronous Splitter
 
 After successfully hardening the splitter against API failures, a final architectural flaw was identified during a full-scale test: the **synchronous** nature of the `/split_library` route caused the entire process to **timeout** and crash when processing a large, messy library. To solve this and complete the MVP, a major architectural upgrade was performed.
 
@@ -340,30 +340,31 @@ After successfully hardening the splitter against API failures, a final architec
 This final upgrade aligns all major features of the application under a consistent, asynchronous, and scalable architecture, marking the successful completion of the core MVP.
 
 ---
-## Case Study: Solving the "Stateless UI" Problem with `sessionStorage`
 
-### The Problem: A Frustrating User Experience
+## Phase 16: Architecting the "Master Blueprint" Local Cache
 
-After successfully implementing the asynchronous Library Splitter, a significant user experience flaw was identified. The application's frontend was **stateless**. This meant that if the user refreshed the page or navigated to another section and came back, the list of successfully generated split files would disappear from the UI.
+With the MVP complete, the focus shifted to a major architectural upgrade to address long-term efficiency and cost. The application's original design was inefficient, making fresh, expensive API calls for every track, every time. This created a slow user experience and an unsustainable cost model.
 
-This forced the user into a frustrating workflow: they would have to re-run the entire, time-consuming split process just to see the results again, even though the files were already saved on the server. This was an unacceptable user experience for a modern web application.
+The solution was to invent a sophisticated local caching system: the **"Master Blueprint"**.
 
----
+### 1. The Core Invention: "Create Once, Render Many Times"
 
-### The Solution: A Pragmatic Frontend State
+The power of the Master Blueprint lies in a simple, intelligent strategy. On the **very first encounter** with a track (a "cache miss"), the application **always calls the OpenAI API using the most "Detailed" setting**. It then saves this complete, high-quality JSON response to the local database as a permanent **"Master Blueprint"** for that track. 🔑
 
-To solve this problem without adding complexity to the backend, a frontend-only solution was chosen using the browser's built-in **`sessionStorage`**. This acts as a temporary memory that persists for the duration of the browser tab session, perfectly matching the user's immediate need without over-engineering the backend for the MVP.
+This blueprint becomes the single source of truth. On all future runs for that same track (a "cache hit"), the application **bypasses the AI entirely**. It instantly loads the saved blueprint from the database and uses a new **dynamic rendering** function to trim it down to whatever detail level the user has selected (`Essential`, `Recommended`, etc.).
 
-The implementation was a simple two-step process:
+This "Create Once, Render Many Times" model is what makes the application feel instantaneous on subsequent runs. It's also the key architectural change that allowed for a major UI simplification: because the "Clear Tags" function could be handled as a separate mode, the redundant "Clear Tags" checkbox and the "None" option on the slider were eliminated in favor of a cleaner, more intuitive "Mode of Operation" control.
 
-1.  **Saving State:** After a split job completes successfully, the JavaScript was updated to save the list of generated file paths as a JSON string into `sessionStorage`.
-2.  **Restoring State:** A new function, `restorePreviousState`, was created to run every time the page loads. This function checks `sessionStorage` for the saved file list. If it finds one, it immediately parses the data and uses the existing `displaySplitResults` function to restore the UI to its previous state.
+### 2. The Outcome: A Faster, Smarter, and Scalable Application
 
----
+The implementation of the Master Blueprint was a complete success, transforming the application's performance and future potential:
 
-### The Result: A Seamless and Intuitive Experience
+* **Instantaneous Speed:** Test runs on cached libraries are now virtually instant, dropping from **~20 seconds to ~0.02 seconds**.
+* **Massive Cost Reduction:** The "pay once, use forever" model dramatically lowers the long-term operational cost of the service.
+* **Superior UI/UX:** The new architecture directly enabled a cleaner, more unambiguous user interface.
+* **Future-Proof Foundation:** This local caching logic serves as the perfect prototype and foundation for the planned V2.0 "Community Cache" feature.
 
-This quick and effective fix dramatically improves the user experience. The UI now "remembers" its last successful state within a session, allowing the user to freely navigate and refresh the page without losing their work. This demonstrates a practical, user-centric approach to solving a common web development challenge by choosing the right tool (`sessionStorage`) for a temporary, session-based problem.
+
 ---
 
 ## Future Roadmap
@@ -381,6 +382,28 @@ These are major architectural upgrades that would transform Tag Genius into a mo
 * **Stateful "Interactive Mode":** A significant evolution from a stateless utility to a stateful web app. This would introduce the "Load/Eject" workflow, allowing a user to upload a file once and perform multiple actions on it (tag, clear, re-tag with different settings) without needing to re-upload. This would require implementing server-side state management and a suite of new API endpoints.
 
 * **Advanced Calibration Profiles:** To further address the subjectivity of tagging, this feature would allow users to select a "Calibration Profile" (e.g., "Hard Techno & Industrial," "Deep & Melodic House," "Classic Funk/Soul"). This profile would apply a specially tuned AI prompt to the entire library run, calibrating the AI's output to the specific nuances of the user's taste without requiring them to split their library.
+
+## The "Tag Genius Radio" Experience
+
+### 1. The Problem: The "Waiting Gap"
+
+Long processing jobs, such as splitting or tagging a large library for the first time, create a period of "dead time" for the user. While the backend is working, the user is left waiting, which can lead to disengagement or the user navigating away from the application.
+
+### 2. The Vision: Turning Dead Time into Discovery Time
+
+The "Tag Genius Radio" is a creative, user-centric feature designed to transform this waiting gap into a valuable and engaging experience. While a long job is processing, the application will function as a personal "radio station," randomly selecting tracks from the user's own library and playing short previews.
+
+This feature turns a passive waiting period into an active moment of musical serendipity, helping DJs rediscover forgotten gems in their own collection. It shifts the application's feel from a simple utility to a memorable and delightful experience, reinforcing the brand as a tool built for true music lovers.
+
+### 3. The Technical Implementation: The "Music Scout" Model
+
+Since the application is a web service and does not have direct access to the user's local audio files, the implementation will leverage third-party streaming APIs (e.g., Spotify, Apple Music) to function as a "Music Scout."
+
+* **Backend Logic:** When a job starts, the backend will randomly select a track (Artist and Title) from the user's uploaded XML. It will then query a streaming service's public API to find a match for that track.
+* **Streaming Previews:** The streaming API will return a publicly accessible URL for a **30-second audio preview**. This URL is then sent to the frontend.
+* **Frontend Player:** The frontend will use a standard HTML `<audio>` player to stream the 30-second preview directly from the provided URL. When the preview finishes, it will automatically request the next random track from the backend.
+
+This web-native approach ensures the feature works for any user on any device, regardless of where their music files are stored. The 30-second preview limitation (due to copyright) is a necessary trade-off, but it is more than sufficient to spark recognition and provide value during the wait.
 
 ---
 

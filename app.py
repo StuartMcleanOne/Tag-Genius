@@ -34,7 +34,6 @@ celery.conf.update(app.config)
 # Enable Cross-Origin Resource Sharing (CORS) for frontend communication
 CORS(app)
 # Global variable to store the path of the last generated XML for export
-LATEST_XML_PATH = None
 
 # --- CONSTANTS ---
 
@@ -990,7 +989,7 @@ def upload_library():
 
             # Dispatch the background task
             process_library_task.delay(log_id, input_path, output_path, config)
-            LATEST_XML_PATH = output_path  # Store path for potential export
+
 
             print(f"Tagging job dispatched with ID {log_id} for {original_filename}.")
 
@@ -1178,58 +1177,38 @@ def download_split_file():
     if not relative_file_path:
         return jsonify({"error": "File path parameter 'path' is required"}), 400
 
+    # --- Diagnostic Logging ---
+    print(f"\n--- DOWNLOAD DEBUG ---")
+    print(f"1. Received raw path from browser: '{relative_file_path}'")
+
     # Normalize path and prevent directory traversal
-    relative_file_path = os.path.normpath(relative_file_path).lstrip('./\\')  # Normalize and remove leading separators
+    relative_file_path = os.path.normpath(relative_file_path).lstrip('./\\')
     if '..' in relative_file_path.split(os.path.sep):
         print(f"Attempted directory traversal detected: {relative_file_path}")
         return jsonify({"error": "Invalid file path (Traversal attempt)"}), 400
+
+    print(f"2. Normalized path: '{relative_file_path}'")
 
     # Construct full path safely within 'outputs'
     safe_base_path = os.path.abspath("outputs")
     requested_path = os.path.join(safe_base_path, relative_file_path)
 
+    print(f"3. Constructed absolute path to check: '{requested_path}'")
+
     # Final check: Ensure resolved path is still inside 'outputs'
     if not os.path.abspath(requested_path).startswith(safe_base_path):
-        print(f"Security violation: Path resolved outside base directory: {requested_path}")
-        return jsonify({"error": "Invalid file path (Security violation)"}), 403  # Forbidden
+        print(f"SECURITY VIOLATION: Path resolved outside base directory: {requested_path}")
+        return jsonify({"error": "Invalid file path (Security violation)"}), 403
 
     # Check if file exists and is actually a file (not a directory)
     if os.path.exists(requested_path) and os.path.isfile(requested_path):
-        print(f"Serving file for download: {requested_path}")
+        print(f"4. SUCCESS: File found. Serving for download.")
+        print(f"--- END DEBUG ---\n")
         return send_file(requested_path, as_attachment=True)
     else:
-        print(f"Download request: File not found at {requested_path}")
+        print(f"4. FAILED: File not found at the constructed path.")
+        print(f"--- END DEBUG ---\n")
         return jsonify({"error": "Requested file not found"}), 404
-
-
-@app.route('/export_xml', methods=['GET'])
-def export_xml():
-    """Allows the user to download the most recently generated tagged XML file."""
-    global LATEST_XML_PATH
-    if LATEST_XML_PATH and os.path.exists(LATEST_XML_PATH) and os.path.isfile(LATEST_XML_PATH):
-        print(f"Exporting last tagged file: {LATEST_XML_PATH}")
-        return send_file(LATEST_XML_PATH, as_attachment=True)
-    else:
-        print(
-            f"Export request failed: LATEST_XML_PATH='{LATEST_XML_PATH}', Exists={os.path.exists(LATEST_XML_PATH if LATEST_XML_PATH else '')}")
-        return jsonify({"error": "No tagged file available to export or file was moved/deleted."}), 404
-
-
-@app.route('/history', methods=['GET'])
-def get_history():
-    """Retrieves the log of all past tagging/processing jobs."""
-    try:
-        with db_cursor() as cursor:
-            # 'SELECT *' to ensure all columns are selected, including new ones.
-            # like job_type and result_data, are always fetched.
-            logs = cursor.execute(
-                "SELECT * FROM processing_log ORDER BY timestamp DESC"
-            ).fetchall()
-        history_list = [dict(row) for row in logs]
-        return jsonify(history_list)
-    except sqlite3.Error as e:
-        print(f"Database error in get_history: {e}")
-        return jsonify({"error": "Failed to retrieve job history"}), 500
 
 
 @app.route('/download_job/<int:job_id>', methods=['GET'])
@@ -1285,6 +1264,53 @@ def download_job_package(job_id):
         print(f"Error creating zip package for job {job_id}: {e}")
         return jsonify({"error": "Failed to create download package."}), 500
 
+@app.route('/export_xml', methods=['GET'])
+def export_xml():
+    """
+    Allows the user to download the most recently generated tagged XML file
+    by looking up the latest completed 'tagging' job in the database.
+    """
+    try:
+        with db_cursor() as cursor:
+            # Find the latest successfully completed 'tagging' job
+            log_entry = cursor.execute(
+                "SELECT output_file_path FROM processing_log "
+                "WHERE status = 'Completed' AND job_type = 'tagging' "
+                "ORDER BY timestamp DESC LIMIT 1"
+            ).fetchone()
+
+        if not log_entry:
+            print("Export request failed: No completed tagging job found in database.")
+            return jsonify({"error": "No tagged file available to export."}), 404
+
+        latest_xml_path = log_entry['output_file_path']
+
+        if latest_xml_path and os.path.exists(latest_xml_path) and os.path.isfile(latest_xml_path):
+            print(f"Exporting latest tagged file from DB: {latest_xml_path}")
+            return send_file(latest_xml_path, as_attachment=True)
+        else:
+            print(f"Export request failed: File not found at path: {latest_xml_path}")
+            return jsonify({"error": "Tagged file path found in DB, but file missing on server."}), 404
+
+    except sqlite3.Error as e:
+        print(f"Database error during export lookup: {e}")
+        return jsonify({"error": "Database error retrieving file path."}), 500
+
+@app.route('/history', methods=['GET'])
+def get_history():
+    """Retrieves the log of all past tagging/processing jobs."""
+    try:
+        with db_cursor() as cursor:
+            # 'SELECT *' to ensure all columns are selected, including new ones.
+            # like job_type and result_data, are always fetched.
+            logs = cursor.execute(
+                "SELECT * FROM processing_log ORDER BY timestamp DESC"
+            ).fetchall()
+        history_list = [dict(row) for row in logs]
+        return jsonify(history_list)
+    except sqlite3.Error as e:
+        print(f"Database error in get_history: {e}")
+        return jsonify({"error": "Failed to retrieve job history"}), 500
 
 @app.route('/log_action', methods=['POST'])
 def log_action():
