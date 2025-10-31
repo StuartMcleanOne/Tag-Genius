@@ -1,14 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">^
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale-1.0">
     <title>Tag Genius</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        .drag-area { border: 2px dashed #9ca3af; border-radius: 1rem; padding: 2rem; text-align: center; transition: all 0.2s ease; }        .drag-area.active { border-color: #3b82f6; background-color: #eff6ff; }
+        .drag-area { border: 2px dashed #9ca3af; border-radius: 1rem; padding: 2rem; text-align: center; transition: all 0.2s ease; }
+        .drag-area.active { border-color: #3b82f6; background-color: #eff6ff; }
         input[type="range"] { -webkit-appearance: none; width: 100%; height: 8px; background: #e5e7eb; border-radius: 5px; outline: none; transition: opacity .2s; }
         input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #1d4ed8; cursor: pointer; border-radius: 50%; border: 2px solid #fff; }
         input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; background: #1d4ed8; cursor: pointer; border-radius: 50%; border: 2px solid #fff; }
@@ -25,10 +26,14 @@
 
         <div id="main-controls">
             <div class="space-y-4">
-                <label for="tagging-level" class="block text-sm font-medium text-gray-700">Tagging Detail Level</label>
+                <label for="tagging-level" class="block text-sm font-medium text-gray-700">Mode Selector</label>
                 <div class="relative w-full">
-                    <input type="range" id="tagging-level" min="0" max="3" value="2" class="w-full">
+                    <input type="range" id="tagging-level" min="0" max="4" value="3" class="w-full">
                     <div class="flex justify-between text-xs text-gray-500 mt-2">
+                        <div class="tooltip relative">
+                            <span>Split Library</span>
+                            <span class="tooltip-text">Splits the library into genre-specific files.</span>
+                        </div>
                         <div class="tooltip relative">
                             <span>Clear Tags</span>
                             <span class="tooltip-text">Clears all AI-generated tags from the file. Does not use the AI.</span>
@@ -59,501 +64,364 @@
             <input type="file" id="file-input" class="hidden" accept=".xml">
         </div>
 
-        <div id="status-message" class="text-center text-sm font-medium mt-4">Upload your Rekordbox XML to get started.</div>
+        <div class="flex justify-center mt-6">
+            <button id="start-tagging-btn" class="px-8 py-3 bg-blue-600 text-white font-semibold rounded-full shadow-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                Run Genius
+            </button>
+        </div>
 
-        <!-- This section displays the results of the library split -->
+        <div class="text-center mt-4">
+            <a href="history.html" class="text-sm text-gray-500 hover:underline">View Log</a>
+        </div>
+
         <div id="split-results-area" class="hidden space-y-2">
             <h3 class="text-lg font-semibold text-gray-800">Split Library Files:</h3>
             <ul id="split-results-list" class="space-y-2">
-                <!-- File items are dynamically added here -->
-            </ul>
+                </ul>
         </div>
 
-        <div class="flex justify-center space-x-4 mt-6">
-            <a href="history.html" id="view-log-btn" class="px-6 py-3 bg-gray-600 text-white font-semibold rounded-full shadow-md hover:bg-gray-700">
-                View Log
-            </a>
-            <button id="split-library-btn" class="px-6 py-3 bg-green-600 text-white font-semibold rounded-full shadow-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                Split Library
-            </button>
-            <button id="start-tagging-btn" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-full shadow-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                Run Genius
-            </button>
-            <button id="export-btn" class="px-6 py-3 bg-gray-500 text-white font-semibold rounded-full shadow-md hover:bg-gray-600 hidden">
-                Export Main XML
-            </button>
-        </div>
     </div>
 
 <script>
-        // --- Get DOM Elements ---
-        const dragArea = document.getElementById('drag-area');
-        const fileInput = document.getElementById('file-input');
-        const startTaggingBtn = document.getElementById('start-tagging-btn');
-        const exportBtn = document.getElementById('export-btn');
-        const statusMessage = document.getElementById('status-message');
-        const taggingLevelInput = document.getElementById('tagging-level');
-        const splitLibraryBtn = document.getElementById('split-library-btn');
-        const splitResultsArea = document.getElementById('split-results-area');
-        const splitResultsList = document.getElementById('split-results-list');
+    // --- Get DOM Elements ---
+    const dragArea = document.getElementById('drag-area');
+    const fileInput = document.getElementById('file-input');
+    const startTaggingBtn = document.getElementById('start-tagging-btn');
+    const taggingLevelInput = document.getElementById('tagging-level');
+    const splitResultsArea = document.getElementById('split-results-area');
+    const splitResultsList = document.getElementById('split-results-list');
 
-        let uploadedFile = null; // Holds the currently selected file object
-        let taggedSplitFiles = []; // Tracks all successfully tagged split file names (e.g., ['Electronic.xml'])
+    // --- Global State ---
+    let uploadedFile = null; // Holds the currently selected file object
+    let taggedSplitFiles = []; // Tracks all successfully tagged split file names
 
+    // --- Configuration ---
+    const tagConfigurations = {
+        "0": { "level": "Split" },
+        "1": { "level": "Clear" },
+        "2": { "level": "Essential", "sub_genre": 1, "energy_vibe": 1, "situation_environment": 1, "components": 1, "time_period": 1 },
+        "3": { "level": "Recommended", "sub_genre": 2, "energy_vibe": 2, "situation_environment": 2, "components": 2, "time_period": 1 },
+        "4": { "level": "Detailed", "sub_genre": 3, "energy_vibe": 3, "situation_environment": 3, "components": 3, "time_period": 1 }
+    };
+    const API_BASE_URL = 'http://127.0.0.1:5001';
 
-        // --- Configuration ---
-        const tagConfigurations = {
-            "0": { "level": "Clear" },
-            "1": { "level": "Essential", "sub_genre": 1, "energy_vibe": 1, "situation_environment": 1, "components": 1, "time_period": 1 },
-            "2": { "level": "Recommended", "sub_genre": 2, "energy_vibe": 2, "situation_environment": 2, "components": 2, "time_period": 1 },
-            "3": { "level": "Detailed", "sub_genre": 3, "energy_vibe": 3, "situation_environment": 3, "components": 3, "time_period": 1 }
-        };
-        const API_BASE_URL = 'http://127.0.0.1:5001'; // Base URL for backend API calls
-
-        // --- Helper Functions ---
-        async function logAction(description) {
-            try {
-                await fetch(`${API_BASE_URL}/log_action`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action_description: description }),
-                });
-                console.log("Action logged:", description);
-            } catch (error) {
-                console.error('Failed to log action:', error);
-            }
-        }
-
-        function handleFile(file) {
-            uploadedFile = file;
-            if (uploadedFile) {
-                statusMessage.textContent = `File selected: ${uploadedFile.name}`;
-                startTaggingBtn.disabled = false;
-                splitLibraryBtn.disabled = false;
-                splitResultsArea.classList.add('hidden');
-                splitResultsList.innerHTML = '';
-                logAction(`User selected file: ${uploadedFile.name}`);
-            } else {
-                 statusMessage.textContent = 'Upload your Rekordbox XML to get started.';
-                 startTaggingBtn.disabled = true;
-                 splitLibraryBtn.disabled = true;
-                 uploadedFile = null;
-            }
-        }
-
-        function displaySplitResults(files) {
-            splitResultsArea.classList.remove('hidden');
-            splitResultsList.innerHTML = '';
-
-            if (!files || files.length === 0) {
-                 splitResultsList.innerHTML = '<li class="text-gray-500">No split files generated or found.</li>';
-                 return;
-            }
-
-            files.forEach(filePath => {
-                const li = document.createElement('li');
-                li.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg';
-                li.dataset.filepath = filePath;
-
-                const fileNameSpan = document.createElement('span');
-                fileNameSpan.className = 'font-mono text-sm text-gray-700';
-                const justFileName = filePath.split('/').pop();
-                fileNameSpan.textContent = justFileName;
-
-                const buttonGroup = document.createElement('div');
-                buttonGroup.className = 'space-x-2';
-
-                // --- CRITICAL FIX: Check if this file name is IN the tracked array ---
-                const isTagged = taggedSplitFiles.includes(justFileName);
-
-                const downloadOriginalBtn = document.createElement('a');
-                downloadOriginalBtn.href = `${API_BASE_URL}/download_split_file?path=${encodeURIComponent(filePath)}`;
-                downloadOriginalBtn.textContent = 'Download Original';
-                downloadOriginalBtn.dataset.action = 'download-original';
-                downloadOriginalBtn.className = 'px-3 py-1 bg-gray-200 text-gray-800 text-xs font-semibold rounded-full hover:bg-gray-300';
-                downloadOriginalBtn.setAttribute('download', '');
-
-                const tagBtn = document.createElement('button');
-                tagBtn.textContent = 'Tag this File';
-                tagBtn.dataset.action = 'tag';
-                tagBtn.className = 'px-3 py-1 bg-blue-500 text-white text-xs font-semibold rounded-full hover:bg-blue-600';
-
-                const downloadTaggedBtn = document.createElement('a');
-                downloadTaggedBtn.href = `${API_BASE_URL}/export_xml`;
-                downloadTaggedBtn.textContent = 'Download Tagged';
-                downloadTaggedBtn.dataset.action = 'download-tagged';
-                downloadTaggedBtn.className = 'px-3 py-1 bg-green-500 text-white text-xs font-semibold rounded-full hover:bg-green-600';
-                downloadTaggedBtn.setAttribute('download', '');
-
-                buttonGroup.appendChild(downloadOriginalBtn);
-
-                if (isTagged) {
-                    // If tagged, show the download tagged button
-                    buttonGroup.appendChild(downloadTaggedBtn);
-                } else {
-                    // If not tagged, show the tag button
-                    buttonGroup.appendChild(tagBtn);
-                }
-
-                li.appendChild(fileNameSpan);
-                li.appendChild(buttonGroup);
-                splitResultsList.appendChild(li);
+    // --- Helper Functions ---
+    async function logAction(description) {
+        try {
+            await fetch(`${API_BASE_URL}/log_action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action_description: description }),
             });
+            console.log("Action logged:", description);
+        } catch (error) {
+            console.error('Failed to log action:', error);
+        }
+    }
+
+    function resetDragAreaToDefault() {
+        dragArea.innerHTML = `<svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg><p class="mt-2 text-sm text-gray-600">Drag & drop your XML file here</p><p class="text-xs text-gray-500 mt-1">or click to browse</p>`;
+        dragArea.style.borderStyle = 'dashed';
+        dragArea.classList.remove('hidden');
+    }
+
+    function handleFile(file) {
+        uploadedFile = file;
+        if (uploadedFile) {
+            dragArea.innerHTML = `<p class="text-lg font-medium text-gray-700">File Selected:</p><p class="text-sm text-gray-500">${uploadedFile.name}</p>`;
+            dragArea.style.borderStyle = 'solid';
+            dragArea.classList.remove('hidden');
+            startTaggingBtn.disabled = false;
+            splitResultsArea.classList.add('hidden');
+            splitResultsList.innerHTML = '';
+            logAction(`User selected file: ${uploadedFile.name}`);
+        } else {
+             resetDragAreaToDefault();
+             startTaggingBtn.disabled = true;
+             uploadedFile = null;
+        }
+    }
+
+    function displaySplitResults(files) {
+        splitResultsArea.classList.remove('hidden');
+        splitResultsList.innerHTML = '';
+
+        if (!files || files.length === 0) {
+             splitResultsList.innerHTML = '<li class="text-gray-500">No split files generated or found.</li>';
+             return;
         }
 
-        async function startTaggingSpecificFile(filePath) {
-            const fileName = filePath.split('/').pop();
-            logAction(`User clicked 'Tag this File' for: ${fileName}`);
-            statusMessage.textContent = `Starting tagging job for ${fileName}...`;
-            startTaggingBtn.disabled = true;
-            splitLibraryBtn.disabled = true;
-
-            // Ensure no level 'Clear' is selected when tagging a specific file
-            const selectedLevel = taggingLevelInput.value === "0" ? "1" : taggingLevelInput.value;
-            const config = { ...tagConfigurations[selectedLevel] };
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/tag_split_file`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        file_path: filePath,
-                        config: config
-                    }),
-                });
-                const result = await response.json();
-
-                if (response.status === 202 && result.job_id) {
-                    statusMessage.textContent = result.message;
-                    pollJobStatus(result.job_id);
-
-                    // --- THE FIX IS HERE ---
-                    // Add the new filename to the PLURAL array.
-                    taggedSplitFiles.push(fileName);
-                    // Save the entire updated array to session storage so it persists.
-                    sessionStorage.setItem('taggedSplitFiles', JSON.stringify(taggedSplitFiles));
-                    // --- END FIX ---
-
-                    logAction(`Tagging job for split file started successfully with ID ${result.job_id}`);
-                } else {
-                    throw new Error(result.error || `Failed to start tagging job for ${fileName}`);
-                }
-            } catch (error) {
-                console.error('Failed to start tagging job for split file:', error);
-                statusMessage.textContent = `Error: ${error.message}`;
-                // Re-enable the correct buttons based on state
-                startTaggingBtn.disabled = false;
-                splitLibraryBtn.disabled = false;
-            }
-        }
-
-        // --- Event Listener Setup ---
-        dragArea.addEventListener('dragover', (e) => { e.preventDefault(); dragArea.classList.add('active'); });
-        dragArea.addEventListener('dragleave', () => { dragArea.classList.remove('active'); });
-        dragArea.addEventListener('drop', (e) => { e.preventDefault(); dragArea.classList.remove('active'); handleFile(e.dataTransfer.files[0]); });
-        dragArea.addEventListener('click', () => { fileInput.click(); });
-        fileInput.addEventListener('change', (e) => { handleFile(e.target.files[0]); });
-
-        // --- Event Delegation for Split Results ---
-        splitResultsList.addEventListener('click', (e) => {
-            // Find the specific button or link that was clicked inside the list
-            const button = e.target.closest('button, a');
-            if (!button) return; // Exit if the click wasn't on a button or link
-
-            // Find the parent list item to get the file path from its data attribute
-            const listItem = e.target.closest('li');
-            if (!listItem || !listItem.dataset.filepath) return;
-
-            const filePath = listItem.dataset.filepath;
-            const action = button.dataset.action;
+        files.forEach(filePath => {
+            const li = document.createElement('li');
+            li.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg';
+            li.dataset.filepath = filePath;
             const justFileName = filePath.split('/').pop();
 
-            if (action === 'tag') {
-                // If the "Tag this File" button was clicked, call the tagging function
-                startTaggingSpecificFile(filePath);
-            } else if (action === 'download') {
-                // If the "Download" link was clicked, just log it. The browser handles the download via href.
-                logAction(`User downloaded split file: ${justFileName}`);
-            }
-        });
+            const fileNameSpan = document.createElement('span');
+            fileNameSpan.className = 'font-mono text-sm text-gray-700';
+            fileNameSpan.textContent = justFileName;
 
-        // --- Initial Button States ---
+            const buttonGroup = document.createElement('div');
+            buttonGroup.className = 'space-x-2';
+
+            const isTagged = taggedSplitFiles.includes(justFileName);
+
+            const downloadOriginalBtn = document.createElement('a');
+            downloadOriginalBtn.href = `${API_BASE_URL}/download_split_file?path=${encodeURIComponent(filePath)}`;
+            downloadOriginalBtn.textContent = 'Download Original';
+            downloadOriginalBtn.dataset.action = 'download-original';
+            downloadOriginalBtn.className = 'px-3 py-1 bg-gray-200 text-gray-800 text-xs font-semibold rounded-full hover:bg-gray-300';
+            downloadOriginalBtn.setAttribute('download', '');
+
+            const tagBtn = document.createElement('button');
+            tagBtn.textContent = 'Tag this File';
+            tagBtn.dataset.action = 'tag';
+            tagBtn.className = 'px-3 py-1 bg-blue-500 text-white text-xs font-semibold rounded-full hover:bg-blue-600';
+
+            const downloadTaggedBtn = document.createElement('a');
+            downloadTaggedBtn.href = `${API_BASE_URL}/export_xml`;
+            downloadTaggedBtn.textContent = 'Download Tagged';
+            downloadTaggedBtn.dataset.action = 'download-tagged';
+            downloadTaggedBtn.className = 'px-3 py-1 bg-green-500 text-white text-xs font-semibold rounded-full hover:bg-green-600';
+            downloadTaggedBtn.setAttribute('download', '');
+
+            buttonGroup.appendChild(downloadOriginalBtn);
+            if (isTagged) {
+                buttonGroup.appendChild(downloadTaggedBtn);
+            } else {
+                buttonGroup.appendChild(tagBtn);
+            }
+            li.appendChild(fileNameSpan);
+            li.appendChild(buttonGroup);
+            splitResultsList.appendChild(li);
+        });
+    }
+
+    async function startTaggingSpecificFile(filePath) {
+        const fileName = filePath.split('/').pop();
+        logAction(`User clicked 'Tag this File' for: ${fileName}`);
+        dragArea.innerHTML = `<p class="text-lg font-medium text-gray-700 animate-pulse">Starting tagging job for ${fileName}...</p>`;
+        dragArea.classList.remove('hidden');
+        splitResultsArea.classList.add('hidden');
+
+        let selectedLevelValue = taggingLevelInput.value;
+        if (selectedLevelValue === "0" || selectedLevelValue === "1") {
+            selectedLevelValue = "2";
+            taggingLevelInput.value = "2";
+        }
+        const config = { ...tagConfigurations[selectedLevelValue] };
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/tag_split_file`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_path: filePath, config: config }),
+            });
+            const result = await response.json();
+
+            if (response.status === 202 && result.job_id) {
+                pollJobStatus(result.job_id);
+                if (!taggedSplitFiles.includes(fileName)) {
+                    taggedSplitFiles.push(fileName);
+                }
+                sessionStorage.setItem('taggedSplitFiles', JSON.stringify(taggedSplitFiles));
+                logAction(`Tagging job for split file started successfully with ID ${result.job_id}`);
+            } else {
+                throw new Error(result.error || `Failed to start tagging job`);
+            }
+        } catch (error) {
+            console.error('Failed to start tagging job:', error);
+            dragArea.innerHTML = `<p class="text-lg font-medium text-red-600">Error: ${error.message}</p>`;
+        }
+    }
+
+    // --- Event Listener Setup ---
+    dragArea.addEventListener('dragover', (e) => { e.preventDefault(); dragArea.classList.add('active'); });
+    dragArea.addEventListener('dragleave', () => { dragArea.classList.remove('active'); });
+    dragArea.addEventListener('drop', (e) => { e.preventDefault(); dragArea.classList.remove('active'); handleFile(e.dataTransfer.files[0]); });
+    dragArea.addEventListener('click', () => { fileInput.click(); });
+    fileInput.addEventListener('change', (e) => { handleFile(e.target.files[0]); });
+
+    splitResultsList.addEventListener('click', (e) => {
+        const button = e.target.closest('button, a');
+        if (!button) return;
+        const listItem = e.target.closest('li');
+        if (!listItem || !listItem.dataset.filepath) return;
+        const filePath = listItem.dataset.filepath;
+        const action = button.dataset.action;
+        const justFileName = filePath.split('/').pop();
+        if (action === 'tag') {
+            e.preventDefault();
+            startTaggingSpecificFile(filePath);
+        } else if (action === 'download-original') {
+            logAction(`User downloaded original split file: ${justFileName}`);
+        } else if (action === 'download-tagged') {
+            logAction(`User downloaded tagged split file: ${justFileName}`);
+        }
+    });
+
+    // --- Initial Button State ---
+    startTaggingBtn.disabled = true;
+
+    // --- Main "Run" Button Logic ---
+    startTaggingBtn.addEventListener('click', async () => {
+        if (!uploadedFile) return;
+
+        const selectedLevel = taggingLevelInput.value;
+        const config = { ...tagConfigurations[selectedLevel] };
+        logAction(`User clicked 'Run Genius' with mode: ${config.level}`);
+
+        dragArea.innerHTML = `<p class="text-lg font-medium text-gray-700 animate-pulse">Dispatching Job...</p>`;
         startTaggingBtn.disabled = true;
-        splitLibraryBtn.disabled = true;
+        splitResultsArea.classList.add('hidden');
+        splitResultsList.innerHTML = '';
 
-        // --- Split Library Button Logic ---
-        splitLibraryBtn.addEventListener('click', async () => {
-            if (!uploadedFile) return;
-            logAction("User clicked 'Split Library'");
-            statusMessage.textContent = "Dispatching split job to the background...";
-            splitLibraryBtn.disabled = true;
-            startTaggingBtn.disabled = true;
-            splitLibraryBtn.textContent = "Splitting...";
-            splitResultsArea.classList.add('hidden');
-            splitResultsList.innerHTML = '';
-            const formData = new FormData();
-            formData.append('file', uploadedFile);
+        const formData = new FormData();
+        formData.append('file', uploadedFile);
+        formData.append('config', JSON.stringify(config));
 
-            try {
-                const response = await fetch(`${API_BASE_URL}/split_library`, {
-                    method: 'POST',
-                    body: formData,
-                });
-                const result = await response.json();
-
-                if (response.status === 202 && result.job_id) {
-                    statusMessage.textContent = result.message;
+        try {
+            const response = await fetch(`${API_BASE_URL}/upload_library`, {
+                method: 'POST',
+                body: formData,
+            });
+            const result = await response.json();
+            if (response.status === 202 && result.job_id) {
+                if (config.level === 'Split') {
                     pollSplitJobStatus(result.job_id);
-                    logAction(`Split job started successfully with ID ${result.job_id}`);
                 } else {
-                    throw new Error(result.error || 'Failed to start split job');
-                }
-            } catch (error) {
-                statusMessage.textContent = `An error occurred: ${error.message}`;
-                logAction(`Split failed to start: ${error.message}`);
-                if (uploadedFile) {
-                    splitLibraryBtn.disabled = false;
-                    startTaggingBtn.disabled = false;
-                }
-                splitLibraryBtn.textContent = "Split Library";
-            }
-        });
-
-        // --- Start Tagging Button Logic ---
-        startTaggingBtn.addEventListener('click', async () => {
-            if (!uploadedFile) return;
-            logAction("User clicked 'Run' (Main File)");
-            statusMessage.textContent = "Uploading and starting job...";
-            startTaggingBtn.disabled = true;
-            splitLibraryBtn.disabled = true;
-            exportBtn.classList.add('hidden');
-            splitResultsArea.classList.add('hidden');
-            splitResultsList.innerHTML = '';
-            const selectedLevel = taggingLevelInput.value;
-            const config = { ...tagConfigurations[selectedLevel] };
-            const formData = new FormData();
-            formData.append('file', uploadedFile);
-            formData.append('config', JSON.stringify(config));
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/upload_library`, {
-                    method: 'POST',
-                    body: formData,
-                });
-                const result = await response.json();
-                if (response.status === 202 && result.job_id) {
-                    statusMessage.textContent = result.message;
                     pollJobStatus(result.job_id);
-                    logAction(`Tagging job started successfully with ID ${result.job_id} for ${uploadedFile.name}`);
-                } else {
-                    throw new Error(result.error || 'Failed to start tagging job');
                 }
-            } catch (error) {
-                console.error('Upload failed:', error);
-                statusMessage.textContent = `Upload failed: ${error.message}. Is the server running?`;
-                logAction(`Tagging job failed to start: ${error.message}`);
-                if (uploadedFile) {
-                     startTaggingBtn.disabled = false;
-                     splitLibraryBtn.disabled = false;
-                }
+                logAction(`Job started successfully with ID ${result.job_id} for ${uploadedFile.name}`);
+            } else {
+                throw new Error(result.error || 'Failed to start job');
             }
-        });
-
-        // --- Polling Function for Tagging Job Status ---
-        function pollJobStatus(jobIdToTrack) {
-            if (window.pollingIntervalId) {
-                clearInterval(window.pollingIntervalId);
+        } catch (error) {
+            console.error('Upload failed:', error);
+            dragArea.innerHTML = `<p class="text-lg font-medium text-red-600">Upload failed: ${error.message}. Is the server running?</p>`;
+            logAction(`Job failed to start: ${error.message}`);
+            if (uploadedFile) {
+                 startTaggingBtn.disabled = false;
             }
-            window.pollingIntervalId = setInterval(async () => {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/history`);
-                    if (!response.ok) throw new Error('Failed to fetch history');
-                    const history = await response.json();
+        }
+    });
 
-                    if (history && history.length > 0) {
-                        const currentJob = history.find(job => job.id === jobIdToTrack);
-                        if (currentJob) {
-                             statusMessage.textContent = `Processing ${currentJob.job_display_name}... (Status: ${currentJob.status})`;
-                             if (currentJob.status === 'Completed' || currentJob.status === 'Failed') {
-                                clearInterval(window.pollingIntervalId);
-                                statusMessage.textContent = `Job '${currentJob.job_display_name}' ${currentJob.status}!`;
-                                if (currentJob.status === 'Completed') {
-                                    exportBtn.classList.remove('hidden');
-                                    sessionStorage.setItem('lastTaggedFilePath', currentJob.output_file_path);
-                                    logAction(`Tagging job completed for ${currentJob.job_display_name}`);
-
-                                    // --- Redraw the list using the stored split results ---
-                                    const splitResults = sessionStorage.getItem('lastSplitResults');
-                                    if (splitResults) {
-                                        // Parse the array of currently tagged files from session storage, if any
-                                        const taggedFilesFromStorage = JSON.parse(sessionStorage.getItem('taggedSplitFiles')) || [];
-                                        // Update the global variable
-                                        taggedSplitFiles = taggedFilesFromStorage;
-                                        // Redraw the list based on the last split job
-                                        displaySplitResults(JSON.parse(splitResults));
-                                    }
-                                    // -------------------------------------------------------------------
-
+    // --- Polling Function for Tagging Job Status ---
+    function pollJobStatus(jobIdToTrack) {
+        if (window.pollingIntervalId) {
+            clearInterval(window.pollingIntervalId);
+        }
+        window.pollingIntervalId = setInterval(async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/history`);
+                if (!response.ok) throw new Error('Failed to fetch history');
+                const history = await response.json();
+                if (history && history.length > 0) {
+                    const currentJob = history.find(job => job.id === jobIdToTrack);
+                    if (currentJob) {
+                         dragArea.innerHTML = `<p class="text-lg font-medium text-gray-700 animate-pulse">Processing ${currentJob.job_display_name}... (Status: ${currentJob.status})</p>`;
+                         if (currentJob.status === 'Completed' || currentJob.status === 'Failed') {
+                            clearInterval(window.pollingIntervalId);
+                            if (currentJob.status === 'Completed') {
+                                logAction(`Tagging job completed for ${currentJob.job_display_name}`);
+                                const splitResults = sessionStorage.getItem('lastSplitResults');
+                                if (splitResults) {
+                                    // This was a "Tag this File" job. Refresh the split list to show new buttons.
+                                    displaySplitResults(JSON.parse(splitResults));
+                                    dragArea.classList.add('hidden');
+                                    splitResultsArea.classList.remove('hidden');
                                 } else {
-                                     logAction(`Tagging job failed for ${currentJob.job_display_name}`);
-                                }
-                                if (uploadedFile) {
-                                     startTaggingBtn.disabled = false;
-                                     splitLibraryBtn.disabled = false;
+                                    // This was a main "Run Genius" tagging job.
+                                    dragArea.innerHTML = `<p class="text-lg font-medium">Job '${currentJob.job_display_name}' Completed!</p><p class="mt-2"><a href="${API_BASE_URL}/export_xml" class="text-sm text-blue-600 hover:underline">Download Tagged Library</a></p>`;
+                                    // After a successful main job, reset the file uploader to default
+                                    resetDragAreaToDefault();
+                                    uploadedFile = null; // Clear the file
                                 }
                             } else {
-                                 statusMessage.textContent = `Waiting for job ID #${jobIdToTrack} to appear in history...`;
+                                 dragArea.innerHTML = `<p class="text-lg font-medium text-red-600">Job '${currentJob.job_display_name}' failed. Check logs.</p>`;
+                                 logAction(`Tagging job failed for ${currentJob.job_display_name}`);
                             }
-                        } else {
-                            statusMessage.textContent = "No job history found yet.";
-                        }
+                            // Re-enable the button only if a file is still selected (e.g., after a failure)
+                            if (uploadedFile) { startTaggingBtn.disabled = false; }
+                         }
                     }
-                } catch (error) {
-                    console.error('Polling error:', error);
-                    statusMessage.textContent = `Polling failed: ${error.message}`;
-                    clearInterval(window.pollingIntervalId);
-                    if (uploadedFile) {
-                         startTaggingBtn.disabled = false;
-                         splitLibraryBtn.disabled = false;
-                    }
-                }
-            }, 5000);
-        }
-
-        // --- Polling Function for Split Job Status ---
-        function pollSplitJobStatus(jobIdToTrack) {
-            if (window.splitPollingIntervalId) {
-                clearInterval(window.splitPollingIntervalId);
-            }
-            window.splitPollingIntervalId = setInterval(async () => {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/history`);
-                    if (!response.ok) throw new Error('Failed to fetch history');
-                    const history = await response.json();
-
-                    if (history && history.length > 0) {
-                        const currentJob = history.find(job => job.id === jobIdToTrack);
-                        if (currentJob) {
-                            statusMessage.textContent = `Processing ${currentJob.job_display_name}... (Status: ${currentJob.status})`;
-                            if (currentJob.status === 'Completed' || currentJob.status === 'Failed') {
-                                clearInterval(window.splitPollingIntervalId);
-                                if (currentJob.status === 'Completed' && currentJob.result_data) {
-                                    const files = JSON.parse(currentJob.result_data);
-                                    displaySplitResults(files);
-                                    statusMessage.textContent = `Job '${currentJob.job_display_name}' completed!`;
-                                    sessionStorage.setItem('lastSplitResults', currentJob.result_data);
-                                    logAction(`Split job ${jobIdToTrack} completed successfully.`);
-                                } else {
-                                    statusMessage.textContent = `Job '${currentJob.job_display_name}' failed. Check logs.`;
-                                    logAction(`Split job ${jobIdToTrack} failed.`);
-                                }
-                                if (uploadedFile) {
-                                    startTaggingBtn.disabled = false;
-                                    splitLibraryBtn.disabled = false;
-                                }
-                                splitLibraryBtn.textContent = "Split Library";
-                            }
-                        } else {
-                            statusMessage.textContent = `Waiting for split job ID #${jobIdToTrack} to appear...`;
-                        }
-                    }
-                } catch (error) {
-                    console.error('Split polling error:', error);
-                    statusMessage.textContent = `Polling failed: ${error.message}`;
-                    clearInterval(window.splitPollingIntervalId);
-                    if (uploadedFile) {
-                        startTaggingBtn.disabled = false;
-                        splitLibraryBtn.disabled = false;
-                    }
-                    splitLibraryBtn.textContent = "Split Library";
-                }
-            }, 5000);
-        }
-
-        // --- Export Button Logic ---
-        exportBtn.addEventListener('click', async () => {
-            logAction("User clicked 'Export Main XML'");
-            statusMessage.textContent = "Exporting file...";
-            exportBtn.disabled = true;
-            try {
-                const response = await fetch(`${API_BASE_URL}/export_xml`);
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    const contentDisposition = response.headers.get('content-disposition');
-                    let filename = 'tagged_library.xml';
-                    if (contentDisposition) {
-                        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
-                        if (filenameMatch && filenameMatch.length > 1) {
-                            filename = filenameMatch[1];
-                        }
-                    }
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                    statusMessage.textContent = "File exported successfully!";
-                    logAction(`Successfully exported ${filename}`);
-                } else {
-                    const result = await response.json();
-                    throw new Error(result.error || 'Export failed');
                 }
             } catch (error) {
-                statusMessage.textContent = `Failed to export: ${error.message}`;
-                logAction(`Export failed: ${error.message}`);
-            } finally {
-                 exportBtn.disabled = false;
+                console.error('Polling error:', error);
+                dragArea.innerHTML = `<p class="text-lg font-medium text-red-600">Polling failed: ${error.message}</p>`;
+                clearInterval(window.pollingIntervalId);
+                if (uploadedFile) { startTaggingBtn.disabled = false; }
             }
-        });
+        }, 5000);
+    }
 
-/**
-         * Checks sessionStorage on page load to restore and display the results
-         * of the most recent split job from the current session.
-         */
-        function restorePreviousState() {
-            console.log("Checking for previous split job in session storage...");
-            const lastSplitResults = sessionStorage.getItem('lastSplitResults');
-            const lastTaggedFilePath = sessionStorage.getItem('lastTaggedFilePath');
+    // --- Polling Function for Split Job Status ---
+    function pollSplitJobStatus(jobIdToTrack) {
+        if (window.splitPollingIntervalId) {
+            clearInterval(window.splitPollingIntervalId);
+        }
+        window.splitPollingIntervalId = setInterval(async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/history`);
+                if (!response.ok) throw new Error('Failed to fetch history');
+                const history = await response.json();
+                if (history && history.length > 0) {
+                    const currentJob = history.find(job => job.id === jobIdToTrack);
+                    if (currentJob) {
+                        dragArea.innerHTML = `<p class="text-lg font-medium text-gray-700 animate-pulse">Processing ${currentJob.job_display_name}... (Status: ${currentJob.status})</p>`;
+                        if (currentJob.status === 'Completed' || currentJob.status === 'Failed') {
+                            clearInterval(window.splitPollingIntervalId);
+                            if (currentJob.status === 'Completed' && currentJob.result_data) {
+                                const files = JSON.parse(currentJob.result_data);
+                                dragArea.classList.add('hidden');
+                                splitResultsArea.classList.remove('hidden');
+                                displaySplitResults(files);
+                                startTaggingBtn.disabled = true; // Main button disabled in split view
+                                sessionStorage.setItem('lastSplitResults', currentJob.result_data);
+                                taggedSplitFiles = []; // Reset for new split session
+                                sessionStorage.setItem('taggedSplitFiles', JSON.stringify([]));
+                                logAction(`Split job ${jobIdToTrack} completed successfully.`);
+                            } else {
+                                dragArea.innerHTML = `<p class="text-lg font-medium text-red-600">Job '${currentJob.job_display_name}' failed. Check logs.</p>`;
+                                if (uploadedFile) { startTaggingBtn.disabled = false; }
+                                logAction(`Split job ${jobIdToTsrack} failed.`);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Split polling error:', error);
+                dragArea.innerHTML = `<p class="text-lg font-medium text-red-600">Polling failed: ${error.message}</p>`;
+                clearInterval(window.splitPollingIntervalId);
+                if (uploadedFile) { startTaggingBtn.disabled = false; }
+            }
+        }, 5000);
+    }
 
-            // --- Load the array of tagged files from storage into the global variable ---
+    function restorePreviousState() {
+        const lastSplitResults = sessionStorage.getItem('lastSplitResults');
+        if (lastSplitResults) {
+            console.log("Found previous split results. Restoring UI.");
             const taggedFilesFromStorage = sessionStorage.getItem('taggedSplitFiles');
             if (taggedFilesFromStorage) {
-                // Parse the JSON string from storage and assign it to the global array.
-                // This restores the tagged status for all split files across page loads.
                 taggedSplitFiles = JSON.parse(taggedFilesFromStorage);
             }
-            // -----------------------------------------------------------------------------------------
-
-            if (lastSplitResults) {
-                console.log("Found previous split results. Restoring UI.");
-                try {
-                    const files = JSON.parse(lastSplitResults);
-                    // Redraw the split list. Since the global taggedSplitFiles array is now populated,
-                    // displaySplitResults will correctly render the 'Download Tagged' state.
-                    displaySplitResults(files);
-                    statusMessage.textContent = "Restored last successful library split.";
-
-                    startTaggingBtn.disabled = true;
-                    splitLibraryBtn.disabled = true;
-
-                } catch (e) {
-                    console.error("Could not parse split results from sessionStorage", e);
-                    sessionStorage.removeItem('lastSplitResults');
-                }
-            }
-
-            if (lastTaggedFilePath) {
-                // Re-enable the Export button if a file path is found (This relies on the DB lookup, which is now fixed)
-                exportBtn.classList.remove('hidden');
+            try {
+                const files = JSON.parse(lastSplitResults);
+                dragArea.classList.add('hidden');
+                splitResultsArea.classList.remove('hidden');
+                displaySplitResults(files);
+                startTaggingBtn.disabled = true;
+            } catch (e) {
+                console.error("Could not parse split results from sessionStorage", e);
+                sessionStorage.removeItem('lastSplitResults');
             }
         }
+    }
 
-        // Run the restore function when the page content is fully loaded
-        document.addEventListener('DOMContentLoaded', restorePreviousState);
-    </script>
+    // Run the restore function when the page content is fully loaded
+    document.addEventListener('DOMContentLoaded', restorePreviousState);
+</script>
 </body>
 </html>
+
