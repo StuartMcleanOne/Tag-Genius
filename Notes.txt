@@ -1,33 +1,30 @@
+Splitting the XML:
+Result:
+The genre "buckets" are displayed at the bottom. The "Run Genius" button is inactive.
+The main XML document cannot be accessed or tagged. The user may decide at this point that he doesnt want to tag his XMLs
+    seperately.
+    - The user cannot go back or reset the tag genius state.
+    - The layout is awkward. View log is a pain in the ass.
+    - The list is still unclear for the user about the "Tag this file" as its not explicitly clear that the user needs
+        to choose a tag level before or at this fork.
+    - The clear tags and Split Library should still be "or" functions to the tagger but perhaps
 
-Essential =
-            "primary_genre": 1 x tag,
-            "sub_genre": 1 x tag,
-            "energy_vibe": 1 x tag,
-            "situation_environment": 1 x tag,
-            "components": 2 x tag,
-            "time_period": 1 x tag
-
-Recommended =
-            "primary_genre": 1 x tag,
-            "sub_genre": 2 x tag,
-            "energy_vibe": 2 x tag,
-            "situation_environment": 2 x tag,
-            "components": 3 x tag,
-            "time_period": 1 x tag
-
-Detailed =
-            "primary_genre": 1 x tag,
-            "sub_genre":  2 < 4 x tag,
-            "energy_vibe": 2 < 4 x tag,
-            "situation_environment": 2 < 4 x tag,
-            "components": 2 < 4 x tag,
-            "time_period": 1 x tag
+    -The user should always have access to the main XML.
+    -Run button active before going to history. Becomes inactive on return to home.
 
 
-            timestamp
-            where the database lives
-            Upload and export
+    Run Genius Broken:
 
+    Logs indicate that the job was successful but there is no file to download.
+    The download tagged library now downloads the file and opens up the upload file window.
 
-            Be sure to move the new flask initialise command to the beginning of the readme file
+    Also the link shouldnt be there because its inconsistant
+    - When the genius has run. The run button becomes inactive , even when I want to change the tagging level.
+    - This is perhaps because TG has ejected the main XML but because the D&D area is occupied with job succession and
+    download link.
+    -
 
+    - The main xml file could always stay loaded.
+    - The tabs at the top could illuminate
+    - Neomorphism buttons for SPlit and Clear tags?
+    - The Run button could display messaging and feedback. Pulse. That solves the conditioning problem.

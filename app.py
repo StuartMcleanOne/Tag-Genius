@@ -933,8 +933,10 @@ def hello_ai():
 
 @app.route('/upload_library', methods=['POST'])
 def upload_library():
-    """Handles XML file upload, saves it uniquely, and dispatches the tagging task."""
-    global LATEST_XML_PATH
+    """
+    Handles XML file upload, saves it, and intelligently dispatches the
+    correct background task (split or tag) based on the user's config.
+    """
     if 'file' not in request.files: return jsonify({"error": "No file part"}), 400
     file = request.files['file']
     if not file or file.filename == '': return jsonify({"error": "No selected file"}), 400
@@ -961,42 +963,70 @@ def upload_library():
             # Create the machine-readable timestamp for unique filenames
             timestamp = now.strftime("%Y%m%d-%H%M%S")
 
-            # Create unique filenames
-            unique_input_filename = f"{name}_{timestamp}{ext}"
-            unique_output_filename = f"tagged_{name}_{timestamp}{ext}"
+            # Checks the selected mode from the slider
+            selected_mode = config.get('level')
 
-            # Define folders and ensure they exist
-            upload_folder, output_folder = "uploads", "outputs"
-            os.makedirs(upload_folder, exist_ok=True)
-            os.makedirs(output_folder, exist_ok=True)
+            if selected_mode == 'Split':
+                job_folder_name = f"{timestamp}_{name}_split"
+                job_folder_path = os.path.join("outputs", job_folder_name)
+                os.makedirs(job_folder_path, exist_ok=True)
 
-            # Construct full paths
-            input_path = os.path.join(upload_folder, unique_input_filename)
-            output_path = os.path.join(output_folder, unique_output_filename)
+                input_path = os.path.join(job_folder_path, "original_library.xml")
+                file.seek(0)
+                file.save(input_path)
 
-            # Save the uploaded file
-            file.seek(0)  # Ensure pointer is at start before saving
-            file.save(input_path)
+                # Create the human-readable display name for the UI
+                human_readable_time = now.strftime("%b %d, %I:%M %p")
+                job_display_name = f"{name} - Split Job ({human_readable_time})"
 
-            # Create the human-readable display name for the UI
-            human_readable_time = now.strftime("%b %d, %I:%M %p")
-            detail_level = config.get('level', 'Unknown')
-            job_display_name = f"{name} - Tagging Job ({detail_level}) ({human_readable_time})"
+                log_id = log_job_start(original_filename, input_path, 'split', job_display_name)
+                if not log_id:
+                    return jsonify({"error": "Failed to create a job log entry."}), 500
 
-            log_id = log_job_start(original_filename, input_path, 'tagging', job_display_name)
-            if not log_id:
-                return jsonify({"error": "Failed to create a job log entry."}), 500
+                # Dispatch the background task
+                split_library_task.delay(log_id, input_path, job_folder_path)
+                print(f"Split job dispatched with ID {log_id} for {original_filename}.")
 
-            # Dispatch the background task
-            process_library_task.delay(log_id, input_path, output_path, config)
+                return jsonify({
+                    "message": "Success! Your library is now being split in the background.",
+                    "job_id": log_id
+                }), 202
 
+            else:
+                # Create unique filenames
+                unique_input_filename = f"{name}_{timestamp}{ext}"
+                unique_output_filename = f"tagged_{name}_{timestamp}{ext}"
 
-            print(f"Tagging job dispatched with ID {log_id} for {original_filename}.")
+                # Define folders and ensure they exist
+                upload_folder, output_folder = "uploads", "outputs"
+                os.makedirs(upload_folder, exist_ok=True)
+                os.makedirs(output_folder, exist_ok=True)
 
-            return jsonify({
-                "message": "Success! Your library is now being processed in the background.",
-                "job_id": log_id
-            }), 202
+                # Construct full paths
+                input_path = os.path.join(upload_folder, unique_input_filename)
+                output_path = os.path.join(output_folder, unique_output_filename)
+
+                # Save the uploaded file
+                file.seek(0)  # Ensure pointer is at start before saving
+                file.save(input_path)
+
+                # Create the human-readable display name for the UI
+                human_readable_time = now.strftime("%b %d, %I:%M %p")
+                job_display_name = f"{name} - Tagging Job ({selected_mode}) ({human_readable_time})"
+
+                log_id = log_job_start(original_filename, input_path, 'tagging', job_display_name)
+                if not log_id:
+                    return jsonify({"error": "Failed to create a job log entry."}), 500
+
+                # Dispatch the background task
+                process_library_task.delay(log_id, input_path, output_path, config)
+
+                print(f"Tagging job dispatched with ID {log_id} for {original_filename}.")
+
+                return jsonify({
+                    "message": "Success! Your library is now being processed in the background.",
+                    "job_id": log_id
+                }), 202
 
         except Exception as e:
             print(f"Error during file save or task dispatch for {file.filename}: {e}")
@@ -1047,64 +1077,6 @@ def analyze_library():
 
     # Fallback error
     return jsonify({"error": "Unknown error during analysis."}), 500
-
-
-@app.route('/split_library', methods=['POST'])
-def split_library():
-    """
-    Handles XML upload, creates a job log, and dispatches the splitting task
-    to a background Celery worker. Returns the job_id for polling.
-    """
-    if 'file' not in request.files: return jsonify({"error": "No file part"}), 400
-    file = request.files['file']
-    if not file or file.filename == '': return jsonify({"error": "No selected file"}), 400
-
-    if file:
-        try:
-            original_filename = file.filename
-            name, ext = os.path.splitext(original_filename)
-
-            # Get the current time once to use for all naming conventions
-            now = datetime.now()
-
-            # Create the machine-readable timestamp for the unique folder name
-            timestamp = now.strftime("%Y%m%d-%H%M%S")
-
-            job_folder_name = f"{timestamp}_{name}_split"
-            job_folder_path = os.path.join("outputs", job_folder_name)
-            os.makedirs(job_folder_path, exist_ok=True)
-
-            input_path = os.path.join(job_folder_path, "original_library.xml")
-            file.seek(0)
-            file.save(input_path)
-
-            # Create the human-readable display name for the UI
-            human_readable_time = now.strftime("%b %d, %I:%M %p")
-            job_display_name = f"{name} - Split Job ({human_readable_time})"
-
-            # Create the unique ID log entry for the new 'split' job.
-            # Crucial for tracking its progress.
-            log_id = log_job_start(original_filename, input_path, 'split', job_display_name)
-            if not log_id:
-                return jsonify({"error": "Failed to create a job log entry."}), 500
-
-            # Dispatch background task with necessary info.
-            split_library_task.delay(log_id, input_path, job_folder_path)
-
-            # Flask server is freed up to respond to user after handing off job to celery worker.
-            print(f"Split job dispatched with ID {log_id} for {original_filename}.")
-
-            # Return a success message and the new job's ID for polling
-            return jsonify({
-                "message": "Success! Your library is now being split in the background.",
-                "job_id": log_id
-            }), 202
-
-        except Exception as e:
-            print(f"Error during file save or split dispatch for {file.filename}: {e}")
-            return jsonify({"error": "Failed to save file or start processing task."}), 500
-
-    return jsonify({"error": "Unknown error during split request."}), 500
 
 
 @app.route('/tag_split_file', methods=['POST'])

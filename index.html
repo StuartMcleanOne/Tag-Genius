@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale-1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tag Genius</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -55,6 +55,7 @@
             </div>
         </div>
 
+        <!-- The drag-area is now ONLY for upload and processing status -->
         <div id="drag-area" class="drag-area">
             <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
@@ -74,10 +75,14 @@
             <a href="history.html" class="text-sm text-gray-500 hover:underline">View Log</a>
         </div>
 
+        <!-- The split-results-area is now the single, dedicated panel for ALL results (Split or Tag) -->
         <div id="split-results-area" class="hidden space-y-2">
-            <h3 class="text-lg font-semibold text-gray-800">Split Library Files:</h3>
+            <h3 id="split-results-title" class="text-lg font-semibold text-gray-800">Split Library Files:</h3>
             <ul id="split-results-list" class="space-y-2">
-                </ul>
+                <!-- Results will be dynamically populated here -->
+            </ul>
+            <!-- This div is a container for the main tagging job download button -->
+            <div id="main-tag-result-container"></div>
         </div>
 
     </div>
@@ -89,7 +94,9 @@
     const startTaggingBtn = document.getElementById('start-tagging-btn');
     const taggingLevelInput = document.getElementById('tagging-level');
     const splitResultsArea = document.getElementById('split-results-area');
+    const splitResultsTitle = document.getElementById('split-results-title');
     const splitResultsList = document.getElementById('split-results-list');
+    const mainTagResultContainer = document.getElementById('main-tag-result-container');
 
     // --- Global State ---
     let uploadedFile = null; // Holds the currently selected file object
@@ -119,21 +126,50 @@
         }
     }
 
+    /**
+     * Resets the drag-area to its default "upload" state.
+     * This is called when the user wants to upload a new file.
+     */
     function resetDragAreaToDefault() {
         dragArea.innerHTML = `<svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg><p class="mt-2 text-sm text-gray-600">Drag & drop your XML file here</p><p class="text-xs text-gray-500 mt-1">or click to browse</p>`;
         dragArea.style.borderStyle = 'dashed';
         dragArea.classList.remove('hidden');
     }
 
+    /**
+     * Resets the drag-area to the "File Selected" state.
+     * This is called after a job finishes, to show the file is still loaded.
+     */
+    function setDragAreaToFileSelected(fileName) {
+        const name = fileName || (uploadedFile ? uploadedFile.name : null);
+        if (name) {
+            dragArea.innerHTML = `<p class="text-lg font-medium text-gray-700">File Selected:</p><p class="text-sm text-gray-500">${name}</p>`;
+            dragArea.style.borderStyle = 'solid';
+            dragArea.classList.remove('hidden');
+            // Only enable the button if the file object is actually present
+            startTaggingBtn.disabled = (uploadedFile === null);
+        } else {
+            resetDragAreaToDefault();
+            startTaggingBtn.disabled = true;
+        }
+    }
+
+    /**
+     * Handles the file selection, updates UI, and enables the Run button.
+     */
     function handleFile(file) {
         uploadedFile = file;
         if (uploadedFile) {
-            dragArea.innerHTML = `<p class="text-lg font-medium text-gray-700">File Selected:</p><p class="text-sm text-gray-500">${uploadedFile.name}</p>`;
-            dragArea.style.borderStyle = 'solid';
-            dragArea.classList.remove('hidden');
-            startTaggingBtn.disabled = false;
-            splitResultsArea.classList.add('hidden');
+            setDragAreaToFileSelected(uploadedFile.name); // Use the helper
+            splitResultsArea.classList.add('hidden'); // Hide old results
             splitResultsList.innerHTML = '';
+            mainTagResultContainer.innerHTML = '';
+            // Clear all session state on new upload
+            sessionStorage.removeItem('lastSplitResults');
+            sessionStorage.removeItem('lastMainTagResult');
+            sessionStorage.removeItem('lastUploadedFileName');
+            sessionStorage.removeItem('taggedSplitFiles');
+            taggedSplitFiles = [];
             logAction(`User selected file: ${uploadedFile.name}`);
         } else {
              resetDragAreaToDefault();
@@ -142,9 +178,13 @@
         }
     }
 
+    /**
+     * Renders the list of split files with correct "Tag" or "Download" buttons.
+     */
     function displaySplitResults(files) {
-        splitResultsArea.classList.remove('hidden');
-        splitResultsList.innerHTML = '';
+        splitResultsTitle.textContent = 'Split Library Files:';
+        splitResultsList.innerHTML = ''; // Clear only the list
+        mainTagResultContainer.innerHTML = ''; // Clear the main tag result
 
         if (!files || files.length === 0) {
              splitResultsList.innerHTML = '<li class="text-gray-500">No split files generated or found.</li>';
@@ -195,14 +235,46 @@
             li.appendChild(buttonGroup);
             splitResultsList.appendChild(li);
         });
+
+        splitResultsArea.classList.remove('hidden'); // Show the results area
     }
 
+    /**
+     * Creates the success message and download button for a main tagging job.
+     */
+    function displayMainTagResult(jobDisplayName) {
+        splitResultsTitle.textContent = 'Job Complete!';
+        splitResultsList.innerHTML = ''; // Clear list
+        mainTagResultContainer.innerHTML = ''; // Clear previous button
+
+        const message = document.createElement('p');
+        message.className = 'text-sm text-gray-700 mb-4';
+        message.textContent = `Your library "${jobDisplayName}" has been successfully tagged.`;
+
+        const downloadButton = document.createElement('a');
+        downloadButton.href = `${API_BASE_URL}/export_xml`;
+        // Style the link to look like a button
+        downloadButton.className = 'inline-block px-6 py-2 bg-green-600 text-white font-semibold rounded-full shadow-md hover:bg-green-700';
+        downloadButton.textContent = 'Download Tagged Library';
+        downloadButton.setAttribute('download', '');
+
+        mainTagResultContainer.appendChild(message);
+        mainTagResultContainer.appendChild(downloadButton);
+
+        splitResultsArea.classList.remove('hidden'); // Show the results area
+    }
+
+    /**
+     * Starts a new job to tag a specific split file.
+     */
     async function startTaggingSpecificFile(filePath) {
         const fileName = filePath.split('/').pop();
         logAction(`User clicked 'Tag this File' for: ${fileName}`);
+
+        // Use the dragArea for processing status, then hide it
         dragArea.innerHTML = `<p class="text-lg font-medium text-gray-700 animate-pulse">Starting tagging job for ${fileName}...</p>`;
         dragArea.classList.remove('hidden');
-        splitResultsArea.classList.add('hidden');
+        splitResultsArea.classList.add('hidden'); // Hide results while processing
 
         let selectedLevelValue = taggingLevelInput.value;
         if (selectedLevelValue === "0" || selectedLevelValue === "1") {
@@ -272,9 +344,11 @@
         logAction(`User clicked 'Run Genius' with mode: ${config.level}`);
 
         dragArea.innerHTML = `<p class="text-lg font-medium text-gray-700 animate-pulse">Dispatching Job...</p>`;
+        dragArea.classList.remove('hidden'); // Ensure it's visible
         startTaggingBtn.disabled = true;
-        splitResultsArea.classList.add('hidden');
+        splitResultsArea.classList.add('hidden'); // Hide results panel
         splitResultsList.innerHTML = '';
+        mainTagResultContainer.innerHTML = '';
 
         const formData = new FormData();
         formData.append('file', uploadedFile);
@@ -325,23 +399,26 @@
                             if (currentJob.status === 'Completed') {
                                 logAction(`Tagging job completed for ${currentJob.job_display_name}`);
                                 const splitResults = sessionStorage.getItem('lastSplitResults');
+
+                                // Check if this was a "Tag this File" job
                                 if (splitResults) {
-                                    // This was a "Tag this File" job. Refresh the split list to show new buttons.
                                     displaySplitResults(JSON.parse(splitResults));
-                                    dragArea.classList.add('hidden');
+                                    dragArea.classList.add('hidden'); // Hide processing message
                                     splitResultsArea.classList.remove('hidden');
                                 } else {
                                     // This was a main "Run Genius" tagging job.
-                                    dragArea.innerHTML = `<p class="text-lg font-medium">Job '${currentJob.job_display_name}' Completed!</p><p class="mt-2"><a href="${API_BASE_URL}/export_xml" class="text-sm text-blue-600 hover:underline">Download Tagged Library</a></p>`;
-                                    // After a successful main job, reset the file uploader to default
-                                    resetDragAreaToDefault();
-                                    uploadedFile = null; // Clear the file
+                                    // 1. Show the results in the dedicated panel
+                                    displayMainTagResult(currentJob.job_display_name);
+                                    // 2. Set the drag area back to "File Selected"
+                                    setDragAreaToFileSelected(uploadedFile.name);
+                                    // 3. Clear split results (as this was a main job)
+                                    sessionStorage.removeItem('lastSplitResults');
                                 }
                             } else {
                                  dragArea.innerHTML = `<p class="text-lg font-medium text-red-600">Job '${currentJob.job_display_name}' failed. Check logs.</p>`;
                                  logAction(`Tagging job failed for ${currentJob.job_display_name}`);
                             }
-                            // Re-enable the button only if a file is still selected (e.g., after a failure)
+                            // Re-enable the "Run Genius" button so the user can re-run or run a new job.
                             if (uploadedFile) { startTaggingBtn.disabled = false; }
                          }
                     }
@@ -374,17 +451,20 @@
                             if (currentJob.status === 'Completed' && currentJob.result_data) {
                                 const files = JSON.parse(currentJob.result_data);
                                 dragArea.classList.add('hidden');
-                                splitResultsArea.classList.remove('hidden');
                                 displaySplitResults(files);
                                 startTaggingBtn.disabled = true; // Main button disabled in split view
+                                // Save the split workspace state
                                 sessionStorage.setItem('lastSplitResults', currentJob.result_data);
                                 taggedSplitFiles = []; // Reset for new split session
                                 sessionStorage.setItem('taggedSplitFiles', JSON.stringify([]));
+                                // Clear any conflicting state
+                                sessionStorage.removeItem('lastMainTagResult');
+                                sessionStorage.removeItem('lastUploadedFileName');
                                 logAction(`Split job ${jobIdToTrack} completed successfully.`);
                             } else {
                                 dragArea.innerHTML = `<p class="text-lg font-medium text-red-600">Job '${currentJob.job_display_name}' failed. Check logs.</p>`;
                                 if (uploadedFile) { startTaggingBtn.disabled = false; }
-                                logAction(`Split job ${jobIdToTsrack} failed.`);
+                                logAction(`Split job ${jobIdToTrack} failed.`);
                             }
                         }
                     }
@@ -398,8 +478,15 @@
         }, 5000);
     }
 
+    /**
+     * Checks sessionStorage on page load to restore and display the results
+     * of the most recent split job from the current session.
+     */
     function restorePreviousState() {
+        // A "main tagging job" is a notification, not a persistent state.
+        // We ONLY restore split jobs, which are a true "workspace".
         const lastSplitResults = sessionStorage.getItem('lastSplitResults');
+
         if (lastSplitResults) {
             console.log("Found previous split results. Restoring UI.");
             const taggedFilesFromStorage = sessionStorage.getItem('taggedSplitFiles');
@@ -409,14 +496,16 @@
             try {
                 const files = JSON.parse(lastSplitResults);
                 dragArea.classList.add('hidden');
-                splitResultsArea.classList.remove('hidden');
                 displaySplitResults(files);
-                startTaggingBtn.disabled = true;
+                startTaggingBtn.disabled = true; // No file loaded, so disable button
             } catch (e) {
                 console.error("Could not parse split results from sessionStorage", e);
                 sessionStorage.removeItem('lastSplitResults');
             }
         }
+        // By NOT having an 'else' block, the page correctly loads in its
+        // default state (with dragArea visible) if no split job is active.
+        // This fixes the "UI lock" bug.
     }
 
     // Run the restore function when the page content is fully loaded
