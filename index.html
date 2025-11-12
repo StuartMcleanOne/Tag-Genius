@@ -5,512 +5,210 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tag Genius</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .drag-area { border: 2px dashed #9ca3af; border-radius: 1rem; padding: 2rem; text-align: center; transition: all 0.2s ease; }
-        .drag-area.active { border-color: #3b82f6; background-color: #eff6ff; }
-        input[type="range"] { -webkit-appearance: none; width: 100%; height: 8px; background: #e5e7eb; border-radius: 5px; outline: none; transition: opacity .2s; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #1d4ed8; cursor: pointer; border-radius: 50%; border: 2px solid #fff; }
-        input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; background: #1d4ed8; cursor: pointer; border-radius: 50%; border: 2px solid #fff; }
-        .tooltip-text { visibility: hidden; background-color: #333; color: #fff; text-align: center; border-radius: 6px; padding: 5px 10px; position: absolute; z-index: 1; bottom: 125%; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.3s; white-space: nowrap; }
-        .tooltip:hover .tooltip-text { visibility: visible; opacity: 1; }
-        #split-results-area { background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1rem; }
-    </style>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
-    <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-lg space-y-6">
-        <div class="text-center relative">
-            <h1 class="text-3xl font-bold text-gray-900">Tag Genius</h1>
+<body class="bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen p-8">
+
+    <!-- VJ LOOP BACKGROUND -->
+    <video muted loop playsinline id="vj-background" class="paused">
+        <source src="Vj_loop_10.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+
+    <!-- HEADER -->
+    <header class="w-full max-w-7xl mx-auto mb-6 rounded-xl">
+        <nav class="flex items-center justify-between p-4">
+            <h1 class="text-2xl font-bold text-blue-600">TAG GENIUS</h1>
+            <div class="flex items-center space-x-8">
+                <a href="history.html" class="text-sm font-medium text-blue-600 hover:text-white-600">LOG</a>
+                <a href="#" class="text-sm font-medium text-blue-600 hover:text-white-600">ABOUT</a>
+                <a href="#" class="text-sm font-medium text-blue-600 hover:text-white-600">CONTACT</a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- MAIN GLASS CONTAINER -->
+    <div class="glass-container rounded-xl shadow-2xl p-12 w-full max-w-7xl mx-auto space-y-8">
+
+        <div>
+            <h2 class="text-3xl font-bold text-gray-300">Tag Genius</h2>
+            <p class="mt-1 text-lg text-gray-500">Never tag again</p>
         </div>
 
-        <div id="main-controls">
-            <div class="space-y-4">
-                <label for="tagging-level" class="block text-sm font-medium text-gray-700">Mode Selector</label>
-                <div class="relative w-full">
-                    <input type="range" id="tagging-level" min="0" max="4" value="3" class="w-full">
-                    <div class="flex justify-between text-xs text-gray-500 mt-2">
-                        <div class="tooltip relative">
-                            <span>Split Library</span>
-                            <span class="tooltip-text">Splits the library into genre-specific files.</span>
+        <!-- MAIN UPLOAD AREA -->
+        <div id="main-upload-area" class="space-y-8">
+
+            <!-- DRAG & DROP -->
+            <div id="drag-area" class="drag-area">
+                <p class="text-sm text-blue-600">Drag & drop your XML file here</p>
+                <p class="text-xs text-gray-500 mt-1">or click to browse</p>
+                <input type="file" id="file-input" class="hidden" accept=".xml">
+            </div>
+
+            <!-- MODE SELECTOR -->
+            <div id="main-controls" class="space-y-4">
+                <label class="block text-lg font-medium text-gray-300">Mode Selector</label>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <input type="radio" name="mode" id="mode-tag" value="tag" class="hidden" checked>
+                    <label for="mode-tag" class="block p-6 rounded-lg cursor-pointer text-center">
+                        <span class="font-semibold text-base">Tag Library</span>
+                        <span class="block text-sm">Add AI tags</span>
+                    </label>
+                    <input type="radio" name="mode" id="mode-split" value="split" class="hidden">
+                    <label for="mode-split" class="block p-6 rounded-lg cursor-pointer text-center">
+                        <span class="font-semibold text-base">Split Library</span>
+                        <span class="block text-sm">By genre</span>
+                    </label>
+                    <input type="radio" name="mode" id="mode-clear" value="clear" class="hidden">
+                    <label for="mode-clear" class="block p-6 rounded-lg cursor-pointer text-center">
+                        <span class="font-semibold text-base">Clear Tags</span>
+                        <span class="block text-sm">Remove AI tags</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- DYNAMIC OPTIONS AREA -->
+            <div class="relative min-h-[160px]">
+
+                <!-- TAGGING LEVEL OPTIONS -->
+                <div id="tagging-level-options" class="space-y-6">
+                    <label class="block text-lg font-medium text-gray-300">Tagging Detail</label>
+                    <div class="flex w-full rounded-lg">
+                        <input type="radio" name="tag-level" id="level-essential" value="2" class="hidden">
+                        <label for="level-essential" class="w-1/3 text-center text-base p-4 rounded-l-lg cursor-pointer font-medium">Essential</label>
+
+                        <input type="radio" name="tag-level" id="level-recommended" value="3" class="hidden" checked>
+                        <label for="level-recommended" class="w-1/3 text-center text-base p-4 cursor-pointer font-medium border-l border-r border-gray-300/50">Recommended</label>
+
+                        <input type="radio" name="tag-level" id="level-detailed" value="4" class="hidden">
+                        <label for="level-detailed" class="w-1/3 text-center text-base p-4 rounded-r-lg cursor-pointer font-medium">Detailed</label>
+                    </div>
+
+                    <!-- TAG PREVIEW CONTAINER -->
+                    <div id="tag-preview-container" class="pt-2">
+                        <div class="bg-gray-800 rounded-lg px-6 py-4">
+
+                            <!-- ESSENTIAL PREVIEW -->
+                            <div id="essential-preview" class="hidden">
+                                <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">SUB GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">ENERGY</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">VIBE</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">SITUATION</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">COMPONENTS</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">YEAR</span><div class="dot-group"><span class="dot"></span></div></div>
+                                </div>
+                            </div>
+
+                            <!-- RECOMMENDED PREVIEW -->
+                            <div id="recommended-preview">
+                                <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">SUB GENRE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">ENERGY</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">VIBE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">SITUATION</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">COMPONENTS</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">YEAR</span><div class="dot-group"><span class="dot"></span></div></div>
+                                </div>
+                            </div>
+
+                            <!-- DETAILED PREVIEW -->
+                            <div id="detailed-preview" class="hidden">
+                                <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">SUB GENRE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">ENERGY</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">VIBE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">SITUATION</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">COMPONENTS</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">YEAR</span><div class="dot-group"><span class="dot"></span></div></div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="tooltip relative">
-                            <span>Clear Tags</span>
-                            <span class="tooltip-text">Clears all AI-generated tags from the file. Does not use the AI.</span>
-                        </div>
-                        <div class="tooltip relative">
-                            <span>Essential</span>
-                            <span class="tooltip-text">Receive only the one core tag per category.</span>
-                        </div>
-                        <div class="tooltip relative">
-                            <span>Recommended</span>
-                            <span class="tooltip-text">Receive a balanced set of 2 tags per category.</span>
-                        </div>
-                        <div class="tooltip relative">
-                            <span>Detailed</span>
-                            <span class="tooltip-text">Generate a comprehensive list of 3 tags per category.</span>
-                        </div>
+                    </div>
+
+                    <!-- SPLIT DESCRIPTION -->
+                    <div id="split-description" class="hidden p-6 bg-blue-50 border border-blue-200 rounded-lg text-base text-blue-800 space-y-2">
+                        <strong class="font-semibold">Split Library by Genre</strong>
+                        <p>This mode will not tag your main file. Instead, it creates a new XML file for each genre (e.g., "House.xml", "Techno.xml"). You can then tag these smaller files individually in the next step.</p>
+                    </div>
+
+                    <!-- CLEAR DESCRIPTION -->
+                    <div id="clear-description" class="hidden p-6 bg-yellow-50 border border-yellow-200 rounded-lg text-base text-yellow-800 space-y-2">
+                        <strong class="font-semibold">Clear AI Tags</strong>
+                        <p>This mode will scan your library and remove all previously generated AI tags. Your original tags will not be affected. <span class="font-medium">This action cannot be undone.</span></p>
                     </div>
                 </div>
             </div>
+
+            <!-- START BUTTON -->
+            <div class="flex justify-center pt-4">
+                <button id="start-job-btn" class="w-full max-w-md px-10 py-5 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-lg">
+                    Start Tagging
+                </button>
+            </div>
         </div>
 
-        <!-- The drag-area is now ONLY for upload and processing status -->
-        <div id="drag-area" class="drag-area">
-            <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-            </svg>
-            <p class="mt-2 text-sm text-gray-600">Drag & drop your XML file here</p>
-            <p class="text-xs text-gray-500 mt-1">or click to browse</p>
-            <input type="file" id="file-input" class="hidden" accept=".xml">
+        <!-- SPLIT WORKSPACE AREA -->
+        <div id="split-workspace-area" class="hidden space-y-6">
+            <div class="flex justify-between items-center">
+                <h2 class="text-2xl font-bold text-gray-800">Split Library Workspace</h2>
+                <button id="start-over-btn" class="text-sm font-medium text-blue-600 hover:underline">Start Over</button>
+            </div>
+
+            <div id="split-tagging-controls" class="space-y-2 p-4 bg-gray-50 rounded-lg">
+                <label class="block text-sm font-medium text-gray-700">Tagging Level for Split Files</label>
+                <div class="flex w-full bg-gray-200 rounded-lg p-1">
+                    <input type="radio" name="split-tag-level" id="split-level-essential" value="2" class="hidden">
+                    <label for="split-level-essential" class="w-1/3 text-center text-sm p-2 rounded-md cursor-pointer font-medium text-gray-700">Essential</label>
+                    <input type="radio" name="split-tag-level" id="split-level-recommended" value="3" class="hidden" checked>
+                    <label for="split-level-recommended" class="w-1/3 text-center text-sm p-2 rounded-md cursor-pointer font-medium text-gray-700">Recommended</label>
+                    <input type="radio" name="split-tag-level" id="split-level-detailed" value="4" class="hidden">
+                    <label for="split-level-detailed" class="w-1/3 text-center text-sm p-2 rounded-md cursor-pointer font-medium text-gray-700">Detailed</label>
+                </div>
+            </div>
+
+            <ul id="split-results-list" class="space-y-3"></ul>
         </div>
 
-        <div class="flex justify-center mt-6">
-            <button id="start-tagging-btn" class="px-8 py-3 bg-blue-600 text-white font-semibold rounded-full shadow-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                Run Genius
-            </button>
-        </div>
-
-        <div class="text-center mt-4">
-            <a href="history.html" class="text-sm text-gray-500 hover:underline">View Log</a>
-        </div>
-
-        <!-- The split-results-area is now the single, dedicated panel for ALL results (Split or Tag) -->
-        <div id="split-results-area" class="hidden space-y-2">
-            <h3 id="split-results-title" class="text-lg font-semibold text-gray-800">Split Library Files:</h3>
-            <ul id="split-results-list" class="space-y-2">
-                <!-- Results will be dynamically populated here -->
-            </ul>
-            <!-- This div is a container for the main tagging job download button -->
+        <!-- MAIN RESULTS AREA -->
+        <div id="main-results-area" class="hidden space-y-2 p-6 bg-green-50 border border-green-200 rounded-lg">
+            <h3 id="main-results-title" class="text-lg font-semibold text-green-800">Job Complete!</h3>
             <div id="main-tag-result-container"></div>
+        </div>
+
+        <!-- STATUS PANEL -->
+        <div id="status-panel" class="hidden p-6 rounded-lg text-center">
+            <p id="status-text" class="text-lg font-medium text-gray-700 animate-pulse">Processing...</p>
         </div>
 
     </div>
 
-<script>
-    // --- Get DOM Elements ---
-    const dragArea = document.getElementById('drag-area');
-    const fileInput = document.getElementById('file-input');
-    const startTaggingBtn = document.getElementById('start-tagging-btn');
-    const taggingLevelInput = document.getElementById('tagging-level');
-    const splitResultsArea = document.getElementById('split-results-area');
-    const splitResultsTitle = document.getElementById('split-results-title');
-    const splitResultsList = document.getElementById('split-results-list');
-    const mainTagResultContainer = document.getElementById('main-tag-result-container');
+    <!-- SVG FILTERS -->
+    <svg style="display: none">
+        <!-- LIQUID LENS REFRACTION FILTER -->
+        <filter id="liquid-lens" x="-20%" y="-20%" width="140%" height="140%">
+            <!-- Create radial gradient for displacement -->
+            <feImage result="displacement-map" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cdefs%3E%3CradialGradient id='grad' cx='50%25' cy='50%25' r='50%25'%3E%3Cstop offset='0%25' stop-color='rgb(128,128,255)'/%3E%3Cstop offset='70%25' stop-color='rgb(128,128,128)'/%3E%3Cstop offset='100%25' stop-color='rgb(128,128,255)'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23grad)'/%3E%3C/svg%3E" />
 
-    // --- Global State ---
-    let uploadedFile = null; // Holds the currently selected file object
-    let taggedSplitFiles = []; // Tracks all successfully tagged split file names
+            <!-- Apply subtle displacement for refraction -->
+            <feDisplacementMap in="SourceGraphic" in2="displacement-map" scale="3" xChannelSelector="R" yChannelSelector="G" result="displaced" />
 
-    // --- Configuration ---
-    const tagConfigurations = {
-        "0": { "level": "Split" },
-        "1": { "level": "Clear" },
-        "2": { "level": "Essential", "sub_genre": 1, "energy_vibe": 1, "situation_environment": 1, "components": 1, "time_period": 1 },
-        "3": { "level": "Recommended", "sub_genre": 2, "energy_vibe": 2, "situation_environment": 2, "components": 2, "time_period": 1 },
-        "4": { "level": "Detailed", "sub_genre": 3, "energy_vibe": 3, "situation_environment": 3, "components": 3, "time_period": 1 }
-    };
-    const API_BASE_URL = 'http://127.0.0.1:5001';
+            <!-- Slight blur for glass smoothness -->
+            <feGaussianBlur in="displaced" stdDeviation="0.5" result="blurred" />
 
-    // --- Helper Functions ---
-    async function logAction(description) {
-        try {
-            await fetch(`${API_BASE_URL}/log_action`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action_description: description }),
-            });
-            console.log("Action logged:", description);
-        } catch (error) {
-            console.error('Failed to log action:', error);
-        }
-    }
+            <!-- Add specular lighting for glass shine -->
+            <feSpecularLighting in="blurred" surfaceScale="2" specularConstant="0.8" specularExponent="20" lighting-color="white" result="specular">
+                <fePointLight x="100" y="100" z="200" />
+            </feSpecularLighting>
 
-    /**
-     * Resets the drag-area to its default "upload" state.
-     * This is called when the user wants to upload a new file.
-     */
-    function resetDragAreaToDefault() {
-        dragArea.innerHTML = `<svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg><p class="mt-2 text-sm text-gray-600">Drag & drop your XML file here</p><p class="text-xs text-gray-500 mt-1">or click to browse</p>`;
-        dragArea.style.borderStyle = 'dashed';
-        dragArea.classList.remove('hidden');
-    }
+            <!-- Composite everything together -->
+            <feComposite in="blurred" in2="specular" operator="arithmetic" k1="0" k2="1" k3="0.3" k4="0" />
+        </filter>
+    </svg>
 
-    /**
-     * Resets the drag-area to the "File Selected" state.
-     * This is called after a job finishes, to show the file is still loaded.
-     */
-    function setDragAreaToFileSelected(fileName) {
-        const name = fileName || (uploadedFile ? uploadedFile.name : null);
-        if (name) {
-            dragArea.innerHTML = `<p class="text-lg font-medium text-gray-700">File Selected:</p><p class="text-sm text-gray-500">${name}</p>`;
-            dragArea.style.borderStyle = 'solid';
-            dragArea.classList.remove('hidden');
-            // Only enable the button if the file object is actually present
-            startTaggingBtn.disabled = (uploadedFile === null);
-        } else {
-            resetDragAreaToDefault();
-            startTaggingBtn.disabled = true;
-        }
-    }
-
-    /**
-     * Handles the file selection, updates UI, and enables the Run button.
-     */
-    function handleFile(file) {
-        uploadedFile = file;
-        if (uploadedFile) {
-            setDragAreaToFileSelected(uploadedFile.name); // Use the helper
-            splitResultsArea.classList.add('hidden'); // Hide old results
-            splitResultsList.innerHTML = '';
-            mainTagResultContainer.innerHTML = '';
-            // Clear all session state on new upload
-            sessionStorage.removeItem('lastSplitResults');
-            sessionStorage.removeItem('lastMainTagResult');
-            sessionStorage.removeItem('lastUploadedFileName');
-            sessionStorage.removeItem('taggedSplitFiles');
-            taggedSplitFiles = [];
-            logAction(`User selected file: ${uploadedFile.name}`);
-        } else {
-             resetDragAreaToDefault();
-             startTaggingBtn.disabled = true;
-             uploadedFile = null;
-        }
-    }
-
-    /**
-     * Renders the list of split files with correct "Tag" or "Download" buttons.
-     */
-    function displaySplitResults(files) {
-        splitResultsTitle.textContent = 'Split Library Files:';
-        splitResultsList.innerHTML = ''; // Clear only the list
-        mainTagResultContainer.innerHTML = ''; // Clear the main tag result
-
-        if (!files || files.length === 0) {
-             splitResultsList.innerHTML = '<li class="text-gray-500">No split files generated or found.</li>';
-             return;
-        }
-
-        files.forEach(filePath => {
-            const li = document.createElement('li');
-            li.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg';
-            li.dataset.filepath = filePath;
-            const justFileName = filePath.split('/').pop();
-
-            const fileNameSpan = document.createElement('span');
-            fileNameSpan.className = 'font-mono text-sm text-gray-700';
-            fileNameSpan.textContent = justFileName;
-
-            const buttonGroup = document.createElement('div');
-            buttonGroup.className = 'space-x-2';
-
-            const isTagged = taggedSplitFiles.includes(justFileName);
-
-            const downloadOriginalBtn = document.createElement('a');
-            downloadOriginalBtn.href = `${API_BASE_URL}/download_split_file?path=${encodeURIComponent(filePath)}`;
-            downloadOriginalBtn.textContent = 'Download Original';
-            downloadOriginalBtn.dataset.action = 'download-original';
-            downloadOriginalBtn.className = 'px-3 py-1 bg-gray-200 text-gray-800 text-xs font-semibold rounded-full hover:bg-gray-300';
-            downloadOriginalBtn.setAttribute('download', '');
-
-            const tagBtn = document.createElement('button');
-            tagBtn.textContent = 'Tag this File';
-            tagBtn.dataset.action = 'tag';
-            tagBtn.className = 'px-3 py-1 bg-blue-500 text-white text-xs font-semibold rounded-full hover:bg-blue-600';
-
-            const downloadTaggedBtn = document.createElement('a');
-            downloadTaggedBtn.href = `${API_BASE_URL}/export_xml`;
-            downloadTaggedBtn.textContent = 'Download Tagged';
-            downloadTaggedBtn.dataset.action = 'download-tagged';
-            downloadTaggedBtn.className = 'px-3 py-1 bg-green-500 text-white text-xs font-semibold rounded-full hover:bg-green-600';
-            downloadTaggedBtn.setAttribute('download', '');
-
-            buttonGroup.appendChild(downloadOriginalBtn);
-            if (isTagged) {
-                buttonGroup.appendChild(downloadTaggedBtn);
-            } else {
-                buttonGroup.appendChild(tagBtn);
-            }
-            li.appendChild(fileNameSpan);
-            li.appendChild(buttonGroup);
-            splitResultsList.appendChild(li);
-        });
-
-        splitResultsArea.classList.remove('hidden'); // Show the results area
-    }
-
-    /**
-     * Creates the success message and download button for a main tagging job.
-     */
-    function displayMainTagResult(jobDisplayName) {
-        splitResultsTitle.textContent = 'Job Complete!';
-        splitResultsList.innerHTML = ''; // Clear list
-        mainTagResultContainer.innerHTML = ''; // Clear previous button
-
-        const message = document.createElement('p');
-        message.className = 'text-sm text-gray-700 mb-4';
-        message.textContent = `Your library "${jobDisplayName}" has been successfully tagged.`;
-
-        const downloadButton = document.createElement('a');
-        downloadButton.href = `${API_BASE_URL}/export_xml`;
-        // Style the link to look like a button
-        downloadButton.className = 'inline-block px-6 py-2 bg-green-600 text-white font-semibold rounded-full shadow-md hover:bg-green-700';
-        downloadButton.textContent = 'Download Tagged Library';
-        downloadButton.setAttribute('download', '');
-
-        mainTagResultContainer.appendChild(message);
-        mainTagResultContainer.appendChild(downloadButton);
-
-        splitResultsArea.classList.remove('hidden'); // Show the results area
-    }
-
-    /**
-     * Starts a new job to tag a specific split file.
-     */
-    async function startTaggingSpecificFile(filePath) {
-        const fileName = filePath.split('/').pop();
-        logAction(`User clicked 'Tag this File' for: ${fileName}`);
-
-        // Use the dragArea for processing status, then hide it
-        dragArea.innerHTML = `<p class="text-lg font-medium text-gray-700 animate-pulse">Starting tagging job for ${fileName}...</p>`;
-        dragArea.classList.remove('hidden');
-        splitResultsArea.classList.add('hidden'); // Hide results while processing
-
-        let selectedLevelValue = taggingLevelInput.value;
-        if (selectedLevelValue === "0" || selectedLevelValue === "1") {
-            selectedLevelValue = "2";
-            taggingLevelInput.value = "2";
-        }
-        const config = { ...tagConfigurations[selectedLevelValue] };
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/tag_split_file`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ file_path: filePath, config: config }),
-            });
-            const result = await response.json();
-
-            if (response.status === 202 && result.job_id) {
-                pollJobStatus(result.job_id);
-                if (!taggedSplitFiles.includes(fileName)) {
-                    taggedSplitFiles.push(fileName);
-                }
-                sessionStorage.setItem('taggedSplitFiles', JSON.stringify(taggedSplitFiles));
-                logAction(`Tagging job for split file started successfully with ID ${result.job_id}`);
-            } else {
-                throw new Error(result.error || `Failed to start tagging job`);
-            }
-        } catch (error) {
-            console.error('Failed to start tagging job:', error);
-            dragArea.innerHTML = `<p class="text-lg font-medium text-red-600">Error: ${error.message}</p>`;
-        }
-    }
-
-    // --- Event Listener Setup ---
-    dragArea.addEventListener('dragover', (e) => { e.preventDefault(); dragArea.classList.add('active'); });
-    dragArea.addEventListener('dragleave', () => { dragArea.classList.remove('active'); });
-    dragArea.addEventListener('drop', (e) => { e.preventDefault(); dragArea.classList.remove('active'); handleFile(e.dataTransfer.files[0]); });
-    dragArea.addEventListener('click', () => { fileInput.click(); });
-    fileInput.addEventListener('change', (e) => { handleFile(e.target.files[0]); });
-
-    splitResultsList.addEventListener('click', (e) => {
-        const button = e.target.closest('button, a');
-        if (!button) return;
-        const listItem = e.target.closest('li');
-        if (!listItem || !listItem.dataset.filepath) return;
-        const filePath = listItem.dataset.filepath;
-        const action = button.dataset.action;
-        const justFileName = filePath.split('/').pop();
-        if (action === 'tag') {
-            e.preventDefault();
-            startTaggingSpecificFile(filePath);
-        } else if (action === 'download-original') {
-            logAction(`User downloaded original split file: ${justFileName}`);
-        } else if (action === 'download-tagged') {
-            logAction(`User downloaded tagged split file: ${justFileName}`);
-        }
-    });
-
-    // --- Initial Button State ---
-    startTaggingBtn.disabled = true;
-
-    // --- Main "Run" Button Logic ---
-    startTaggingBtn.addEventListener('click', async () => {
-        if (!uploadedFile) return;
-
-        const selectedLevel = taggingLevelInput.value;
-        const config = { ...tagConfigurations[selectedLevel] };
-        logAction(`User clicked 'Run Genius' with mode: ${config.level}`);
-
-        dragArea.innerHTML = `<p class="text-lg font-medium text-gray-700 animate-pulse">Dispatching Job...</p>`;
-        dragArea.classList.remove('hidden'); // Ensure it's visible
-        startTaggingBtn.disabled = true;
-        splitResultsArea.classList.add('hidden'); // Hide results panel
-        splitResultsList.innerHTML = '';
-        mainTagResultContainer.innerHTML = '';
-
-        const formData = new FormData();
-        formData.append('file', uploadedFile);
-        formData.append('config', JSON.stringify(config));
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/upload_library`, {
-                method: 'POST',
-                body: formData,
-            });
-            const result = await response.json();
-            if (response.status === 202 && result.job_id) {
-                if (config.level === 'Split') {
-                    pollSplitJobStatus(result.job_id);
-                } else {
-                    pollJobStatus(result.job_id);
-                }
-                logAction(`Job started successfully with ID ${result.job_id} for ${uploadedFile.name}`);
-            } else {
-                throw new Error(result.error || 'Failed to start job');
-            }
-        } catch (error) {
-            console.error('Upload failed:', error);
-            dragArea.innerHTML = `<p class="text-lg font-medium text-red-600">Upload failed: ${error.message}. Is the server running?</p>`;
-            logAction(`Job failed to start: ${error.message}`);
-            if (uploadedFile) {
-                 startTaggingBtn.disabled = false;
-            }
-        }
-    });
-
-    // --- Polling Function for Tagging Job Status ---
-    function pollJobStatus(jobIdToTrack) {
-        if (window.pollingIntervalId) {
-            clearInterval(window.pollingIntervalId);
-        }
-        window.pollingIntervalId = setInterval(async () => {
-            try {
-                const response = await fetch(`${API_BASE_URL}/history`);
-                if (!response.ok) throw new Error('Failed to fetch history');
-                const history = await response.json();
-                if (history && history.length > 0) {
-                    const currentJob = history.find(job => job.id === jobIdToTrack);
-                    if (currentJob) {
-                         dragArea.innerHTML = `<p class="text-lg font-medium text-gray-700 animate-pulse">Processing ${currentJob.job_display_name}... (Status: ${currentJob.status})</p>`;
-                         if (currentJob.status === 'Completed' || currentJob.status === 'Failed') {
-                            clearInterval(window.pollingIntervalId);
-                            if (currentJob.status === 'Completed') {
-                                logAction(`Tagging job completed for ${currentJob.job_display_name}`);
-                                const splitResults = sessionStorage.getItem('lastSplitResults');
-
-                                // Check if this was a "Tag this File" job
-                                if (splitResults) {
-                                    displaySplitResults(JSON.parse(splitResults));
-                                    dragArea.classList.add('hidden'); // Hide processing message
-                                    splitResultsArea.classList.remove('hidden');
-                                } else {
-                                    // This was a main "Run Genius" tagging job.
-                                    // 1. Show the results in the dedicated panel
-                                    displayMainTagResult(currentJob.job_display_name);
-                                    // 2. Set the drag area back to "File Selected"
-                                    setDragAreaToFileSelected(uploadedFile.name);
-                                    // 3. Clear split results (as this was a main job)
-                                    sessionStorage.removeItem('lastSplitResults');
-                                }
-                            } else {
-                                 dragArea.innerHTML = `<p class="text-lg font-medium text-red-600">Job '${currentJob.job_display_name}' failed. Check logs.</p>`;
-                                 logAction(`Tagging job failed for ${currentJob.job_display_name}`);
-                            }
-                            // Re-enable the "Run Genius" button so the user can re-run or run a new job.
-                            if (uploadedFile) { startTaggingBtn.disabled = false; }
-                         }
-                    }
-                }
-            } catch (error) {
-                console.error('Polling error:', error);
-                dragArea.innerHTML = `<p class="text-lg font-medium text-red-600">Polling failed: ${error.message}</p>`;
-                clearInterval(window.pollingIntervalId);
-                if (uploadedFile) { startTaggingBtn.disabled = false; }
-            }
-        }, 5000);
-    }
-
-    // --- Polling Function for Split Job Status ---
-    function pollSplitJobStatus(jobIdToTrack) {
-        if (window.splitPollingIntervalId) {
-            clearInterval(window.splitPollingIntervalId);
-        }
-        window.splitPollingIntervalId = setInterval(async () => {
-            try {
-                const response = await fetch(`${API_BASE_URL}/history`);
-                if (!response.ok) throw new Error('Failed to fetch history');
-                const history = await response.json();
-                if (history && history.length > 0) {
-                    const currentJob = history.find(job => job.id === jobIdToTrack);
-                    if (currentJob) {
-                        dragArea.innerHTML = `<p class="text-lg font-medium text-gray-700 animate-pulse">Processing ${currentJob.job_display_name}... (Status: ${currentJob.status})</p>`;
-                        if (currentJob.status === 'Completed' || currentJob.status === 'Failed') {
-                            clearInterval(window.splitPollingIntervalId);
-                            if (currentJob.status === 'Completed' && currentJob.result_data) {
-                                const files = JSON.parse(currentJob.result_data);
-                                dragArea.classList.add('hidden');
-                                displaySplitResults(files);
-                                startTaggingBtn.disabled = true; // Main button disabled in split view
-                                // Save the split workspace state
-                                sessionStorage.setItem('lastSplitResults', currentJob.result_data);
-                                taggedSplitFiles = []; // Reset for new split session
-                                sessionStorage.setItem('taggedSplitFiles', JSON.stringify([]));
-                                // Clear any conflicting state
-                                sessionStorage.removeItem('lastMainTagResult');
-                                sessionStorage.removeItem('lastUploadedFileName');
-                                logAction(`Split job ${jobIdToTrack} completed successfully.`);
-                            } else {
-                                dragArea.innerHTML = `<p class="text-lg font-medium text-red-600">Job '${currentJob.job_display_name}' failed. Check logs.</p>`;
-                                if (uploadedFile) { startTaggingBtn.disabled = false; }
-                                logAction(`Split job ${jobIdToTrack} failed.`);
-                            }
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Split polling error:', error);
-                dragArea.innerHTML = `<p class="text-lg font-medium text-red-600">Polling failed: ${error.message}</p>`;
-                clearInterval(window.splitPollingIntervalId);
-                if (uploadedFile) { startTaggingBtn.disabled = false; }
-            }
-        }, 5000);
-    }
-
-    /**
-     * Checks sessionStorage on page load to restore and display the results
-     * of the most recent split job from the current session.
-     */
-    function restorePreviousState() {
-        // A "main tagging job" is a notification, not a persistent state.
-        // We ONLY restore split jobs, which are a true "workspace".
-        const lastSplitResults = sessionStorage.getItem('lastSplitResults');
-
-        if (lastSplitResults) {
-            console.log("Found previous split results. Restoring UI.");
-            const taggedFilesFromStorage = sessionStorage.getItem('taggedSplitFiles');
-            if (taggedFilesFromStorage) {
-                taggedSplitFiles = JSON.parse(taggedFilesFromStorage);
-            }
-            try {
-                const files = JSON.parse(lastSplitResults);
-                dragArea.classList.add('hidden');
-                displaySplitResults(files);
-                startTaggingBtn.disabled = true; // No file loaded, so disable button
-            } catch (e) {
-                console.error("Could not parse split results from sessionStorage", e);
-                sessionStorage.removeItem('lastSplitResults');
-            }
-        }
-        // By NOT having an 'else' block, the page correctly loads in its
-        // default state (with dragArea visible) if no split job is active.
-        // This fixes the "UI lock" bug.
-    }
-
-    // Run the restore function when the page content is fully loaded
-    document.addEventListener('DOMContentLoaded', restorePreviousState);
-</script>
 </body>
 </html>
-
