@@ -1,0 +1,56 @@
+Phase 17: The "Liquid Glass Winamp" UI/UX Architecture
+The Problem: A "Pro" Backend with a "Utility" Frontend
+With the "Master Blueprint" caching (Phase 16) and the asynchronous "Intelligent Splitter" (Phase 15) complete, the backend was a robust, scalable engine. However, the frontend remained a simple "Phase 15" utility built with placeholder-style controls.
+
+This created a major UX disconnect: a powerful, professional backend was trapped behind an "ugly" and "sloppy" frontend. The "split workspace" was a simple <ul> list, creating a "workflow dead end" (as identified in the UX Audit). This UI did not match the project's high-end "Pro" creative direction or its business_case.md value proposition.
+
+The Solution: The "Winamp" Metaphor
+The solution was a complete ground-up redesign of the index.html, replacing the entire single-page UI with a "bento box" layout directly inspired by the classic Winamp media player.
+
+This "Winamp" metaphor provides the perfect, scalable, and modular layout for the application's entire workflow. It pays homage to the project's "Forged in the fires of Winamp" ethos and provides a clear, intuitive, and "elegant" UI for all MVP and V2.0 features.
+
+The Creative Direction: "Liquid Glass Pro"
+The aesthetic is "Liquid Glass Pro."
+
+Background (Layer 1): The "Pro Deck" (Concept 2) VJ loop plays on a continuous, "bouncing" loop in the background, set to a dark filter (brightness(0.4)) to create the "in-the-club" vibe.
+
+UI (Layer 2): The Winamp modules are built using a "Liquid Glass Toolkit" (Treatments 1-4). These modules "float" on top of the VJ loop. backdrop-filter: blur() and SVG filters (#glass-distortion, #mini-liquid-lens) are used to warp and refract the light from the VJ loop below, making the UI feel "alive."
+
+The New Architecture: A 3-Module "Bento Box"
+The new index.html maps the entire application workflow onto Winamp's three classic modules:
+
+1. The "Main Player" Module (The "Job" Module)
+This is the new "front door" and primary action center.
+
+Eject Button: (Treatment 3) This is the new "Upload File" control.
+
+Play Button: (Treatment 3) This is the standardized "Start Job" control, which runs the selected mode.
+
+Scrub Bar: (Treatment 4) This is the "Job Progress" bar. The "liquid" thumb (.active state) appears to visualize a job in progress.
+
+Title Display: This is the main statusText feed, which displays the job_display_name and status from the backend's /history poller.
+
+2. The "Equalizer" Module (The "Controls" Module)
+This module replaces the old slider and checkbox, housing all user inputs.
+
+Drag & Drop: The file drop zone is now integrated into this module.
+
+Mode Selector: (Treatment 2) A "bouncy toggle" for the three main modes: [TAG], [SPLIT], [CLEAR]. This directly controls which config is sent to the /upload_library endpoint.
+
+Detail Selector: (Treatment 2) A second "bouncy toggle" for the three detail levels: [ | ], [ || ], [ ||| ], which correspond to Essential, Recommended, and Detailed.
+
+V2.0 Home: This module provides a scalable home for the V2.0 "Advanced Calibration Profiles" (Techno Genius, etc.).
+
+3. The "Playlist Editor" Module (The "Genre Hub")
+This is the "elegant" solution to the "ugly list" and split-workspace-area.
+
+Function: It is the "Genre Hub" that appears after a split_library_task is successfully completed.
+
+Data: It consumes the result_data (the JSON list of file paths) from the /history polling response.
+
+UI: It renders the split files (e.g., Electronic.xml (1240 tracks)) as a clickable "playlist."
+
+The "Loopback": This module solves the "workflow dead end." It contains the "Tag this" button (/tag_split_file endpoint) for each file, allowing the user to select a split file, choose a detail level, and hit "Play" on the Main Player to run a new, targeted tagging job. It also "remembers" the split state using sessionStorage.
+
+The Outcome
+This new architecture unifies the app's powerful backend with its high-concept creative vision. It solves the core "ugly list" problem for the MVP, creates a delightful and "wild" user experience, and builds the perfect, scalable foundation for all "Future Roadmap" features.

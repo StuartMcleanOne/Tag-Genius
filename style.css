@@ -1,0 +1,271 @@
+/* ===== FONTS & GLOBAL ===== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+
+body {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+
+.hidden {
+    display: none;
+}
+
+/* ===== VJ BACKGROUND VIDEO ===== */
+#vj-background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+    opacity: 1; /* Full brightness - no milky effect */
+    transition: opacity 0.5s ease;
+}
+
+/* Paused state - show first frame clearly */
+#vj-background.paused {
+    filter: brightness(0.95);
+}
+
+/* ===== LIQUID GLASS CONTAINER ===== */
+.glass-container {
+    position: relative;
+    z-index: 10;
+    backdrop-filter: blur(12px) saturate(180%);
+    background: rgba(0, 0, 0, 0.4); /* Dark semi-transparent background */
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    filter: url(#liquid-lens);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Glass inner glow - subtle light refraction */
+.glass-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: inherit;
+    padding: 2px;
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.6) 0%,
+        rgba(255, 255, 255, 0) 50%,
+        rgba(255, 255, 255, 0.6) 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Content needs to be above the pseudo-element */
+.glass-container > * {
+    position: relative;
+    z-index: 2;
+}
+
+/* ===== HEADER GLASS EFFECT ===== */
+header {
+    backdrop-filter: blur(8px) saturate(150%);
+    background: rgba(255, 255, 255, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+/* ===== MODE SELECTOR RADIO BUTTONS ===== */
+input[name="mode"] + label {
+    border: 2px solid rgba(209, 213, 219, 0.5);
+    background-color: rgba(255, 255, 255, 0.3);
+    color: #1f2937;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(10px) saturate(150%);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+input[name="mode"]:checked + label {
+    border-color: #2563EB;
+    background-color: #2563EB;
+    color: #FFFFFF;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    transform: translateY(-2px);
+}
+
+input[name="mode"] + label:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ===== TAGGING DETAIL SEGMENTED CONTROL ===== */
+input[name="tag-level"] + label {
+    background-color: rgba(229, 231, 235, 0.8);
+    color: #374151;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+}
+
+input[name="tag-level"]:checked + label {
+    background-color: #2563EB;
+    color: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
+/* ===== SPLIT WORKSPACE SEGMENTED CONTROL ===== */
+input[name="split-tag-level"] + label {
+    transition: all 0.2s ease;
+}
+
+input[name="split-tag-level"]:checked + label {
+    background-color: #fff;
+    color: #1d4ed8;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* ===== DRAG & DROP AREA ===== */
+.drag-area {
+    border: 2px dashed rgba(156, 163, 175, 0.6);
+    border-radius: 0.75rem;
+    padding: 2.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(12px) saturate(150%);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+.drag-area.active {
+    border-color: #3b82f6;
+    background-color: rgba(239, 246, 255, 0.8);
+    transform: scale(1.02);
+    box-shadow: 0 8px 16px rgba(59, 130, 246, 0.2);
+}
+
+.drag-area:hover {
+    border-color: #6b7280;
+    background-color: rgba(255, 255, 255, 0.6);
+}
+
+/* ===== DOT INDICATORS ===== */
+.dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    background-color: #22c55e;
+    border-radius: 50%;
+    margin-left: 6px;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+    animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.6;
+        transform: scale(0.95);
+    }
+}
+
+.dot-group {
+    display: flex;
+    align-items: center;
+}
+
+/* ===== BUTTON ENHANCEMENTS ===== */
+button, a.btn {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:hover:not(:disabled), a.btn:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.1);
+}
+
+button:active:not(:disabled), a.btn:active {
+    transform: translateY(0);
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* ===== STATUS PANEL GLASS ===== */
+#status-panel {
+    backdrop-filter: blur(15px) saturate(150%);
+    background: rgba(249, 250, 251, 0.3);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* ===== SPLIT RESULTS LIST ITEMS ===== */
+#split-results-list li {
+    backdrop-filter: blur(10px) saturate(150%);
+    background: rgba(255, 255, 255, 0.25);
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+#split-results-list li:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* ===== RESPONSIVE ADJUSTMENTS ===== */
+@media (max-width: 768px) {
+    .glass-container {
+        padding: 1.5rem;
+        background: rgba(255, 255, 255, 0.25);
+    }
+
+    #vj-background {
+        opacity: 1; /* Keep full brightness on mobile too */
+    }
+
+    .drag-area {
+        padding: 1.5rem;
+    }
+}
+
+/* ===== SCROLLBAR STYLING (OPTIONAL) ===== */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(37, 99, 235, 0.5);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(37, 99, 235, 0.7);
+}
+
+/* ===== LOADING/PROCESSING STATES ===== */
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* ===== ACCESSIBILITY ===== */
+*:focus-visible {
+    outline: 2px solid #2563EB;
+    outline-offset: 2px;
+}
