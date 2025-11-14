@@ -6,6 +6,11 @@ body {
     margin: 0;
     padding: 0;
     overflow-x: hidden;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 
 .hidden {
@@ -21,48 +26,55 @@ body {
     height: 100%;
     object-fit: cover;
     z-index: 0;
-    opacity: 1; /* Full brightness - no milky effect */
+    opacity: 1;
     transition: opacity 0.5s ease;
 }
 
-/* Paused state - show first frame clearly */
 #vj-background.paused {
     filter: brightness(0.95);
 }
 
-/* ===== LIQUID GLASS CONTAINER ===== */
+/* ===== DRAMATIC LIQUID GLASS CONTAINER ===== */
 .glass-container {
     position: relative;
     z-index: 10;
-    backdrop-filter: blur(12px) saturate(180%);
-    background: rgba(0, 0, 0, 0.4); /* Dark semi-transparent background */
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    filter: url(#liquid-lens);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(8px) saturate(180%) brightness(1.1);
+    background: rgba(0, 0, 0, 0.25); /* Dark tint for contrast */
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    /* Deep shadows without harsh white insets */
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.6),
+        0 0 40px rgba(0, 0, 0, 0.3),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.15);
 }
 
-/* Glass inner glow - subtle light refraction */
+/* Subtle static highlight layer */
 .glass-container::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     border-radius: inherit;
-    padding: 2px;
     background: linear-gradient(135deg,
-        rgba(255, 255, 255, 0.6) 0%,
-        rgba(255, 255, 255, 0) 50%,
-        rgba(255, 255, 255, 0.6) 100%);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
+        rgba(255, 255, 255, 0.06) 0%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.04) 100%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Subtle edge highlights */
+.glass-container::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 0%, transparent 30%, transparent 70%, rgba(0, 0, 0, 0.1) 100%);
     pointer-events: none;
     z-index: 1;
 }
 
-/* Content needs to be above the pseudo-element */
+/* Content sits on top */
 .glass-container > * {
     position: relative;
     z-index: 2;
@@ -70,47 +82,84 @@ body {
 
 /* ===== HEADER GLASS EFFECT ===== */
 header {
-    backdrop-filter: blur(8px) saturate(150%);
-    background: rgba(255, 255, 255, 0.2);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(10px) saturate(180%);
+    background: rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+header h1 {
+    color: #ffffff;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+header a {
+    color: #e5e7eb !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+header a:hover {
+    color: #60a5fa !important;
+}
+
+/* Status text visibility */
+#status-text {
+    color: #f3f4f6;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    font-weight: 500;
 }
 
 /* ===== MODE SELECTOR RADIO BUTTONS ===== */
 input[name="mode"] + label {
-    border: 2px solid rgba(209, 213, 219, 0.5);
-    background-color: rgba(255, 255, 255, 0.3);
-    color: #1f2937;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    backdrop-filter: blur(10px) saturate(150%);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-input[name="mode"]:checked + label {
-    border-color: #2563EB;
-    background-color: #2563EB;
-    color: #FFFFFF;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-    transform: translateY(-2px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px) saturate(180%);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 input[name="mode"] + label:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    background-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+input[name="mode"]:checked + label {
+    border-color: #fff;
+    background-color: #fff;
+    color: #1d4ed8;
+    box-shadow: 0 4px 16px rgba(255, 255, 255, 0.3);
+}
+
+/* Make subtext visible on white selected buttons */
+input[name="mode"]:checked + label .text-gray-300 {
+    color: #4b5563 !important; /* gray-600 - much darker for contrast */
+}
+
+input[name="mode"]:checked + label:hover {
+    background-color: #f0f0f0;
+}
+
+/* Make subtext darker when button is selected */
+input[name="mode"]:checked + label .text-gray-300 {
+    color: #6b7280 !important;
+}
+
+/* Make subtext darker when button is selected */
+input[name="mode"]:checked + label .text-gray-300 {
+    color: #4b5563 !important;
 }
 
 /* ===== TAGGING DETAIL SEGMENTED CONTROL ===== */
 input[name="tag-level"] + label {
-    background-color: rgba(229, 231, 235, 0.8);
-    color: #374151;
+    color: #e5e7eb;
     transition: all 0.2s ease;
-    backdrop-filter: blur(10px);
 }
 
 input[name="tag-level"]:checked + label {
-    background-color: #2563EB;
-    color: #FFFFFF;
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+    background-color: #fff;
+    color: #1d4ed8;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 /* ===== SPLIT WORKSPACE SEGMENTED CONTROL ===== */
@@ -126,26 +175,26 @@ input[name="split-tag-level"]:checked + label {
 
 /* ===== DRAG & DROP AREA ===== */
 .drag-area {
-    border: 2px dashed rgba(156, 163, 175, 0.6);
+    border: 2px dashed rgba(156, 163, 175, 0.5);
     border-radius: 0.75rem;
     padding: 2.5rem;
     text-align: center;
     transition: all 0.3s ease;
-    background: rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(12px) saturate(150%);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px) saturate(180%);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 .drag-area.active {
     border-color: #3b82f6;
-    background-color: rgba(239, 246, 255, 0.8);
+    background-color: rgba(59, 130, 246, 0.2);
     transform: scale(1.02);
-    box-shadow: 0 8px 16px rgba(59, 130, 246, 0.2);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
 }
 
 .drag-area:hover {
-    border-color: #6b7280;
-    background-color: rgba(255, 255, 255, 0.6);
+    border-color: #9ca3af;
+    background-color: rgba(255, 255, 255, 0.08);
 }
 
 /* ===== DOT INDICATORS ===== */
@@ -153,10 +202,10 @@ input[name="split-tag-level"]:checked + label {
     display: inline-block;
     width: 10px;
     height: 10px;
-    background-color: #22c55e;
+    background-color: #4ade80;
     border-radius: 50%;
     margin-left: 6px;
-    box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+    box-shadow: 0 0 12px rgba(74, 222, 128, 1);
     animation: pulse-dot 2s ease-in-out infinite;
 }
 
@@ -178,16 +227,15 @@ input[name="split-tag-level"]:checked + label {
 
 /* ===== BUTTON ENHANCEMENTS ===== */
 button, a.btn {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 
 button:hover:not(:disabled), a.btn:hover {
-    transform: translateY(-2px);
     filter: brightness(1.1);
 }
 
 button:active:not(:disabled), a.btn:active {
-    transform: translateY(0);
+    filter: brightness(0.95);
 }
 
 button:disabled {
@@ -205,14 +253,39 @@ button:disabled {
 /* ===== SPLIT RESULTS LIST ITEMS ===== */
 #split-results-list li {
     backdrop-filter: blur(10px) saturate(150%);
-    background: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.08);
     transition: all 0.2s ease;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 #split-results-list li:hover {
-    transform: translateX(4px);
+    background: rgba(255, 255, 255, 0.12);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Add scrollbar for split results */
+#split-results-list {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+/* Custom scrollbar styling */
+#split-results-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+#split-results-list::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+#split-results-list::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.5);
+    border-radius: 4px;
+}
+
+#split-results-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(59, 130, 246, 0.7);
 }
 
 /* ===== RESPONSIVE ADJUSTMENTS ===== */
@@ -223,7 +296,7 @@ button:disabled {
     }
 
     #vj-background {
-        opacity: 1; /* Keep full brightness on mobile too */
+        opacity: 1;
     }
 
     .drag-area {

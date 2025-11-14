@@ -12,77 +12,81 @@
 
     <!-- VJ LOOP BACKGROUND -->
     <video muted loop playsinline id="vj-background" class="paused">
-        <source src="Vj_loop_10.mp4" type="video/mp4">
+        <source src="vj_loop_4_BW.mp4_compressed.mp4" type="video/mp4">
         Your browser does not support the video tag.
     </video>
 
-    <!-- HEADER -->
+    <!-- HEADER NAVIGATION -->
     <header class="w-full max-w-7xl mx-auto mb-6 rounded-xl">
         <nav class="flex items-center justify-between p-4">
-            <h1 class="text-2xl font-bold text-blue-600">TAG GENIUS</h1>
-            <div class="flex items-center space-x-8">
-                <a href="history.html" class="text-sm font-medium text-blue-600 hover:text-white-600">LOG</a>
-                <a href="#" class="text-sm font-medium text-blue-600 hover:text-white-600">ABOUT</a>
-                <a href="#" class="text-sm font-medium text-blue-600 hover:text-white-600">CONTACT</a>
+            <div class="text-sm font-medium text-white">
+                <span id="status-text">Ready</span>
+            </div>
+            <div class="flex items-center space-x-6">
+                <a href="history.html" class="text-sm font-medium text-white hover:text-blue-400 transition-colors">HISTORY</a>
+                <a href="workspace.html" class="text-sm font-medium text-white hover:text-blue-400 transition-colors">WORKSPACE</a>
             </div>
         </nav>
     </header>
 
     <!-- MAIN GLASS CONTAINER -->
-    <div class="glass-container rounded-xl shadow-2xl p-12 w-full max-w-7xl mx-auto space-y-8">
+    <div class="glass-container rounded-xl shadow-2xl p-12 w-full max-w-7xl mx-auto min-h-[700px] relative">
 
-        <div>
-            <h2 class="text-3xl font-bold text-gray-300">Tag Genius</h2>
-            <p class="mt-1 text-lg text-gray-500">Never tag again</p>
-        </div>
+        <!-- LOGO (ABSOLUTE POSITIONED, TOP LEFT) -->
+        <img src="Tag_Genius_Logo_6.png" alt="Tag Genius" class="absolute top-8 left-8 drop-shadow-2xl" style="width: 250px; height: 160px; z-index: 10;">
 
         <!-- MAIN UPLOAD AREA -->
         <div id="main-upload-area" class="space-y-8">
 
-            <!-- DRAG & DROP -->
-            <div id="drag-area" class="drag-area">
-                <p class="text-sm text-blue-600">Drag & drop your XML file here</p>
-                <p class="text-xs text-gray-500 mt-1">or click to browse</p>
-                <input type="file" id="file-input" class="hidden" accept=".xml">
+            <!-- TOP ROW: UPLOAD BOX (TOP RIGHT) -->
+            <div class="flex justify-end mb-8">
+                <div id="drag-area" class="drag-area w-80">
+                    <p class="text-sm text-blue-600 font-medium">Drag & drop your XML file here</p>
+                    <p class="text-xs text-gray-500 mt-1">or click to browse</p>
+                    <input type="file" id="file-input" class="hidden" accept=".xml">
+                </div>
             </div>
 
             <!-- MODE SELECTOR -->
             <div id="main-controls" class="space-y-4">
-                <label class="block text-lg font-medium text-gray-300">Mode Selector</label>
+                <label class="block text-lg font-medium text-white">Mode Selector</label>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <input type="radio" name="mode" id="mode-tag" value="tag" class="hidden" checked>
                     <label for="mode-tag" class="block p-6 rounded-lg cursor-pointer text-center">
                         <span class="font-semibold text-base">Tag Library</span>
-                        <span class="block text-sm">Add AI tags</span>
+                        <span class="block text-sm mt-1 text-gray-300">Add AI tags</span>
                     </label>
                     <input type="radio" name="mode" id="mode-split" value="split" class="hidden">
                     <label for="mode-split" class="block p-6 rounded-lg cursor-pointer text-center">
                         <span class="font-semibold text-base">Split Library</span>
-                        <span class="block text-sm">By genre</span>
+                        <span class="block text-sm mt-1 text-gray-300">By genre</span>
                     </label>
                     <input type="radio" name="mode" id="mode-clear" value="clear" class="hidden">
                     <label for="mode-clear" class="block p-6 rounded-lg cursor-pointer text-center">
                         <span class="font-semibold text-base">Clear Tags</span>
-                        <span class="block text-sm">Remove AI tags</span>
+                        <span class="block text-sm mt-1 text-gray-300">Remove AI tags</span>
                     </label>
                 </div>
             </div>
 
             <!-- DYNAMIC OPTIONS AREA -->
-            <div class="relative min-h-[160px]">
+            <div class="relative" style="min-height: 420px;">
 
                 <!-- TAGGING LEVEL OPTIONS -->
                 <div id="tagging-level-options" class="space-y-6">
-                    <label class="block text-lg font-medium text-gray-300">Tagging Detail</label>
-                    <div class="flex w-full rounded-lg">
-                        <input type="radio" name="tag-level" id="level-essential" value="2" class="hidden">
-                        <label for="level-essential" class="w-1/3 text-center text-base p-4 rounded-l-lg cursor-pointer font-medium">Essential</label>
+                    <label class="block text-lg font-medium text-white">Tagging Detail</label>
+                    <div class="space-y-2 p-4 bg-gray-800 bg-opacity-50 rounded-lg">
+                        <label class="block text-sm font-medium text-gray-300">Detail Level</label>
+                        <div class="flex w-full bg-gray-700 bg-opacity-50 rounded-lg p-1">
+                            <input type="radio" name="tag-level" id="level-essential" value="2" class="hidden">
+                            <label for="level-essential" class="w-1/3 text-center text-sm p-2 rounded-md cursor-pointer font-medium text-gray-300">Essential</label>
 
-                        <input type="radio" name="tag-level" id="level-recommended" value="3" class="hidden" checked>
-                        <label for="level-recommended" class="w-1/3 text-center text-base p-4 cursor-pointer font-medium border-l border-r border-gray-300/50">Recommended</label>
+                            <input type="radio" name="tag-level" id="level-recommended" value="3" class="hidden" checked>
+                            <label for="level-recommended" class="w-1/3 text-center text-sm p-2 rounded-md cursor-pointer font-medium text-gray-300">Recommended</label>
 
-                        <input type="radio" name="tag-level" id="level-detailed" value="4" class="hidden">
-                        <label for="level-detailed" class="w-1/3 text-center text-base p-4 rounded-r-lg cursor-pointer font-medium">Detailed</label>
+                            <input type="radio" name="tag-level" id="level-detailed" value="4" class="hidden">
+                            <label for="level-detailed" class="w-1/3 text-center text-sm p-2 rounded-md cursor-pointer font-medium text-gray-300">Detailed</label>
+                        </div>
                     </div>
 
                     <!-- TAG PREVIEW CONTAINER -->
@@ -92,86 +96,69 @@
                             <!-- ESSENTIAL PREVIEW -->
                             <div id="essential-preview" class="hidden">
                                 <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">SUB GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">ENERGY</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">VIBE</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">SITUATION</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">COMPONENTS</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">YEAR</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">SUB GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">ENERGY</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">VIBE</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">SITUATION</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">COMPONENTS</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">YEAR</span><div class="dot-group"><span class="dot"></span></div></div>
                                 </div>
                             </div>
 
                             <!-- RECOMMENDED PREVIEW -->
                             <div id="recommended-preview">
                                 <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">SUB GENRE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">ENERGY</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">VIBE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">SITUATION</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">COMPONENTS</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">YEAR</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">SUB GENRE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">ENERGY</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">VIBE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">SITUATION</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">COMPONENTS</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">YEAR</span><div class="dot-group"><span class="dot"></span></div></div>
                                 </div>
                             </div>
 
                             <!-- DETAILED PREVIEW -->
                             <div id="detailed-preview" class="hidden">
                                 <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">SUB GENRE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">ENERGY</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">VIBE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">SITUATION</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">COMPONENTS</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-gray-400 tracking-wider">YEAR</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">SUB GENRE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">ENERGY</span><div class="dot-group"><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">VIBE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">SITUATION</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">COMPONENTS</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
+                                    <div class="flex items-center space-x-3"><span class="text-sm font-medium text-white tracking-wider">YEAR</span><div class="dot-group"><span class="dot"></span></div></div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- SPLIT DESCRIPTION -->
-                    <div id="split-description" class="hidden p-6 bg-blue-50 border border-blue-200 rounded-lg text-base text-blue-800 space-y-2">
-                        <strong class="font-semibold">Split Library by Genre</strong>
-                        <p>This mode will not tag your main file. Instead, it creates a new XML file for each genre (e.g., "House.xml", "Techno.xml"). You can then tag these smaller files individually in the next step.</p>
+                    <div id="split-description" class="hidden p-6 bg-blue-50 border border-blue-200 rounded-lg text-base text-blue-800 space-y-3">
+                        <strong class="font-semibold text-lg">Split Library by Genre</strong>
+                        <p>This mode creates separate XML files for each genre in your library (e.g., "Electronic.xml", "Hip_Hop.xml", "Rock.xml").</p>
+                        <p class="text-sm">💡 <strong>Tip:</strong> Use this to organize large libraries before tagging. You can then tag each genre file individually with genre-specific settings for better results.</p>
                     </div>
 
                     <!-- CLEAR DESCRIPTION -->
-                    <div id="clear-description" class="hidden p-6 bg-yellow-50 border border-yellow-200 rounded-lg text-base text-yellow-800 space-y-2">
-                        <strong class="font-semibold">Clear AI Tags</strong>
-                        <p>This mode will scan your library and remove all previously generated AI tags. Your original tags will not be affected. <span class="font-medium">This action cannot be undone.</span></p>
+                    <div id="clear-description" class="hidden p-6 bg-yellow-50 border border-yellow-200 rounded-lg text-base text-yellow-800 space-y-3">
+                        <strong class="font-semibold text-lg">Clear AI Tags</strong>
+                        <p>This mode removes all AI-generated tags from your library, including Genre, Sub-genre, Energy, Vibe, Situation, Components, and Year data.</p>
+                        <p class="text-sm">⚠️ <strong>Note:</strong> This action cannot be undone. Your original manual tags and track data will not be affected. Use this to start fresh or remove outdated AI tags.</p>
                     </div>
                 </div>
             </div>
 
             <!-- START BUTTON -->
-            <div class="flex justify-center pt-4">
-                <button id="start-job-btn" class="w-full max-w-md px-10 py-5 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-lg">
+            <div class="flex justify-center gap-4 pt-6">
+                <button id="start-job-btn" class="flex-1 px-10 py-6 bg-white text-blue-900 font-semibold text-xl rounded-xl shadow-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                     Start Tagging
                 </button>
+                <button id="cancel-job-btn" class="hidden px-10 py-6 bg-red-600 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-red-700 transition-all">
+                    Cancel
+                </button>
             </div>
-        </div>
-
-        <!-- SPLIT WORKSPACE AREA -->
-        <div id="split-workspace-area" class="hidden space-y-6">
-            <div class="flex justify-between items-center">
-                <h2 class="text-2xl font-bold text-gray-800">Split Library Workspace</h2>
-                <button id="start-over-btn" class="text-sm font-medium text-blue-600 hover:underline">Start Over</button>
-            </div>
-
-            <div id="split-tagging-controls" class="space-y-2 p-4 bg-gray-50 rounded-lg">
-                <label class="block text-sm font-medium text-gray-700">Tagging Level for Split Files</label>
-                <div class="flex w-full bg-gray-200 rounded-lg p-1">
-                    <input type="radio" name="split-tag-level" id="split-level-essential" value="2" class="hidden">
-                    <label for="split-level-essential" class="w-1/3 text-center text-sm p-2 rounded-md cursor-pointer font-medium text-gray-700">Essential</label>
-                    <input type="radio" name="split-tag-level" id="split-level-recommended" value="3" class="hidden" checked>
-                    <label for="split-level-recommended" class="w-1/3 text-center text-sm p-2 rounded-md cursor-pointer font-medium text-gray-700">Recommended</label>
-                    <input type="radio" name="split-tag-level" id="split-level-detailed" value="4" class="hidden">
-                    <label for="split-level-detailed" class="w-1/3 text-center text-sm p-2 rounded-md cursor-pointer font-medium text-gray-700">Detailed</label>
-                </div>
-            </div>
-
-            <ul id="split-results-list" class="space-y-3"></ul>
         </div>
 
         <!-- MAIN RESULTS AREA -->
@@ -182,31 +169,34 @@
 
         <!-- STATUS PANEL -->
         <div id="status-panel" class="hidden p-6 rounded-lg text-center">
-            <p id="status-text" class="text-lg font-medium text-gray-700 animate-pulse">Processing...</p>
+            <p id="status-text-panel" class="text-lg font-medium text-gray-300 animate-pulse">Processing...</p>
         </div>
 
     </div>
 
     <!-- SVG FILTERS -->
     <svg style="display: none">
-        <!-- LIQUID LENS REFRACTION FILTER -->
-        <filter id="liquid-lens" x="-20%" y="-20%" width="140%" height="140%">
-            <!-- Create radial gradient for displacement -->
-            <feImage result="displacement-map" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cdefs%3E%3CradialGradient id='grad' cx='50%25' cy='50%25' r='50%25'%3E%3Cstop offset='0%25' stop-color='rgb(128,128,255)'/%3E%3Cstop offset='70%25' stop-color='rgb(128,128,128)'/%3E%3Cstop offset='100%25' stop-color='rgb(128,128,255)'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23grad)'/%3E%3C/svg%3E" />
+        <!-- LIQUID GLASS DISTORTION FILTER WITH ENHANCED SPECULAR LIGHTING -->
+        <filter id="glass-distortion" x="-20%" y="-20%" width="140%" height="140%" filterUnits="objectBoundingBox">
+            <!-- Generate organic noise pattern -->
+            <feTurbulence type="fractalNoise" baseFrequency="0.015 0.015" numOctaves="2" seed="5" result="turbulence" />
 
-            <!-- Apply subtle displacement for refraction -->
-            <feDisplacementMap in="SourceGraphic" in2="displacement-map" scale="3" xChannelSelector="R" yChannelSelector="G" result="displaced" />
+            <!-- Soften the noise map -->
+            <feGaussianBlur in="turbulence" stdDeviation="2" result="softMap" />
 
-            <!-- Slight blur for glass smoothness -->
-            <feGaussianBlur in="displaced" stdDeviation="0.5" result="blurred" />
-
-            <!-- Add specular lighting for glass shine -->
-            <feSpecularLighting in="blurred" surfaceScale="2" specularConstant="0.8" specularExponent="20" lighting-color="white" result="specular">
-                <fePointLight x="100" y="100" z="200" />
+            <!-- CREATE SPECULAR LIGHTING - Enhanced for visibility -->
+            <feSpecularLighting in="softMap" surfaceScale="8" specularConstant="1.5" specularExponent="120" lighting-color="#ffffff" result="specLight">
+                <fePointLight x="-100" y="-100" z="400" />
             </feSpecularLighting>
 
-            <!-- Composite everything together -->
-            <feComposite in="blurred" in2="specular" operator="arithmetic" k1="0" k2="1" k3="0.3" k4="0" />
+            <!-- Blend specular highlights with original -->
+            <feComposite in="specLight" in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.8" k3="0.4" k4="0" result="litImage" />
+
+            <!-- Apply displacement for liquid refraction -->
+            <feDisplacementMap in="litImage" in2="softMap" scale="35" xChannelSelector="R" yChannelSelector="G" result="displaced" />
+
+            <!-- Final composite back with source -->
+            <feBlend in="displaced" in2="SourceGraphic" mode="normal" />
         </filter>
     </svg>
 

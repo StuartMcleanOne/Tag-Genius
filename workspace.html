@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tag Genius - Workspace</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen p-8">
+
+    <!-- VJ LOOP BACKGROUND - MATCHES INDEX.HTML -->
+    <video muted loop playsinline id="vj-background" class="paused">
+        <source src="vj_loop_4_BW.mp4_compressed.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+
+    <!-- HEADER NAVIGATION -->
+    <header class="w-full max-w-7xl mx-auto mb-6 rounded-xl">
+        <nav class="flex items-center justify-between p-4">
+            <h1 class="text-xl font-bold text-white">Workspace</h1>
+            <div class="flex items-center space-x-6">
+                <a href="index.html" class="text-sm font-medium text-white hover:text-blue-400 transition-colors">HOME</a>
+                <a href="history.html" class="text-sm font-medium text-white hover:text-blue-400 transition-colors">HISTORY</a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- MAIN GLASS CONTAINER -->
+    <div class="glass-container rounded-xl shadow-2xl p-12 w-full max-w-7xl mx-auto min-h-[700px]">
+
+        <div class="mb-6">
+            <p class="text-sm text-gray-300">Manage your split files and active projects</p>
+        </div>
+
+        <!-- TAGGING LEVEL CONTROL -->
+        <div id="split-tagging-controls" class="space-y-2 p-4 bg-gray-800 bg-opacity-50 rounded-lg mb-6">
+            <label class="block text-sm font-medium text-gray-300">Tagging Level for Files</label>
+            <div class="flex w-full bg-gray-700 bg-opacity-50 rounded-lg p-1">
+                <input type="radio" name="split-tag-level" id="split-level-essential" value="2" class="hidden">
+                <label for="split-level-essential" class="w-1/3 text-center text-sm p-2 rounded-md cursor-pointer font-medium text-gray-300">Essential</label>
+                <input type="radio" name="split-tag-level" id="split-level-recommended" value="3" class="hidden" checked>
+                <label for="split-level-recommended" class="w-1/3 text-center text-sm p-2 rounded-md cursor-pointer font-medium text-gray-300">Recommended</label>
+                <input type="radio" name="split-tag-level" id="split-level-detailed" value="4" class="hidden">
+                <label for="split-level-detailed" class="w-1/3 text-center text-sm p-2 rounded-md cursor-pointer font-medium text-gray-300">Detailed</label>
+            </div>
+        </div>
+
+        <!-- FILES LIST -->
+        <div id="loading-message" class="text-center text-gray-300 py-8">
+            <div class="animate-pulse">Loading workspace...</div>
+        </div>
+
+        <ul id="workspace-files-list" class="space-y-3 hidden"></ul>
+
+        <div id="empty-message" class="hidden text-center text-gray-400 py-8">
+            <svg class="mx-auto h-12 w-12 text-gray-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <p>No files in workspace</p>
+            <p class="text-sm mt-1">Split or upload files from HOME to get started</p>
+        </div>
+
+    </div>
+
+    <script src="workspace.js"></script>
+
+</body>
+</html>

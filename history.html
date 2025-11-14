@@ -3,84 +3,268 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tag Genius - Action History</title>
+    <title>Tag Genius - History</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
         }
+
+        .job-card {
+            transition: all 0.2s ease;
+        }
+
+        .job-card:hover {
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Scrollable history container */
+        #history-container {
+            max-height: 600px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        #history-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #history-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+
+        #history-container::-webkit-scrollbar-thumb {
+            background: rgba(59, 130, 246, 0.5);
+            border-radius: 4px;
+        }
+
+        #history-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(59, 130, 246, 0.7);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-completed {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-failed {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-in-progress {
+            background-color: #dbeafe;
+            color: #1e40af;
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
     </style>
 </head>
-<body class="bg-gray-100 p-8">
-    <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-2xl mx-auto">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold text-gray-900">User Action History</h1>
-            <a href="index.html" class="text-sm text-blue-600 hover:underline">&larr; Back to Tag Genius</a>
+<body class="bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen p-8 flex flex-col justify-center items-center">
+
+    <!-- VJ LOOP BACKGROUND -->
+    <video muted loop playsinline id="vj-background" class="paused">
+        <source src="vj_loop_4_BW.mp4_compressed.mp4" type="video/mp4">
+    </video>
+
+    <!-- HEADER NAVIGATION -->
+    <header class="w-full max-w-7xl mx-auto mb-6 rounded-xl">
+        <nav class="flex items-center justify-between p-4">
+            <h1 class="text-xl font-bold text-white">History</h1>
+            <div class="flex items-center space-x-6">
+                <a href="index.html" class="text-sm font-medium text-white hover:text-blue-400 transition-colors">HOME</a>
+                <a href="workspace.html" class="text-sm font-medium text-white hover:text-blue-400 transition-colors">WORKSPACE</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="glass-container rounded-xl shadow-2xl p-12 w-full max-w-7xl mx-auto min-h-[700px]">
+        <div class="mb-6">
+            <p class="text-sm text-gray-300">View and download your processed libraries</p>
         </div>
 
-        <div id="loading-message" class="text-center text-gray-500">
-            Loading history...
+        <div id="loading-message" class="text-center text-gray-300 py-8">
+            <div class="animate-pulse">Loading job history...</div>
         </div>
 
-        <ul id="history-list" class="space-y-3">
-            <!-- History items will be added here by JavaScript -->
-        </ul>
+        <div id="history-container" class="space-y-4 hidden">
+        </div>
 
-        <div id="error-message" class="hidden text-center text-red-600 mt-4">
-            Failed to load history.
+        <div id="empty-message" class="hidden text-center text-gray-400 py-8">
+            <svg class="mx-auto h-12 w-12 text-gray-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <p>No jobs found</p>
+            <p class="text-sm mt-1">Upload a library to get started</p>
+        </div>
+
+        <div id="error-message" class="hidden text-center text-red-400 py-8">
+            <p class="font-semibold">Failed to load job history</p>
+            <p class="text-sm mt-1">Please check your connection and try again</p>
+            <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                Retry
+            </button>
         </div>
     </div>
 
+    <!-- SVG FILTERS -->
+    <svg style="display: none">
+        <!-- LIQUID GLASS DISTORTION FILTER WITH ENHANCED SPECULAR LIGHTING -->
+        <filter id="glass-distortion" x="-20%" y="-20%" width="140%" height="140%" filterUnits="objectBoundingBox">
+            <!-- Generate organic noise pattern -->
+            <feTurbulence type="fractalNoise" baseFrequency="0.015 0.015" numOctaves="2" seed="5" result="turbulence" />
+
+            <!-- Soften the noise map -->
+            <feGaussianBlur in="turbulence" stdDeviation="2" result="softMap" />
+
+            <!-- CREATE SPECULAR LIGHTING - Enhanced for visibility -->
+            <feSpecularLighting in="softMap" surfaceScale="8" specularConstant="1.5" specularExponent="120" lighting-color="#ffffff" result="specLight">
+                <fePointLight x="-100" y="-100" z="400" />
+            </feSpecularLighting>
+
+            <!-- Blend specular highlights with original -->
+            <feComposite in="specLight" in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.8" k3="0.4" k4="0" result="litImage" />
+
+            <!-- Apply displacement for liquid refraction -->
+            <feDisplacementMap in="litImage" in2="softMap" scale="35" xChannelSelector="R" yChannelSelector="G" result="displaced" />
+
+            <!-- Final composite back with source -->
+            <feBlend in="displaced" in2="SourceGraphic" mode="normal" />
+        </filter>
+    </svg>
+
     <script>
-        // Get references to the HTML elements
-        const historyList = document.getElementById('history-list');
+        const API_BASE_URL = 'http://127.0.0.1:5001';
+        const historyContainer = document.getElementById('history-container');
         const loadingMessage = document.getElementById('loading-message');
+        const emptyMessage = document.getElementById('empty-message');
         const errorMessage = document.getElementById('error-message');
 
-        // Function to fetch and display the history
+        function formatTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
+        }
+
+        function getStatusBadge(status) {
+            let statusClass = 'status-completed';
+            if (status === 'Failed') {
+                statusClass = 'status-failed';
+            } else if (status === 'In Progress') {
+                statusClass = 'status-in-progress';
+            }
+            return '<span class="status-badge ' + statusClass + '">' + status + '</span>';
+        }
+
+        function createDownloadButtons(job) {
+            if (job.status !== 'Completed') {
+                return '<p class="text-sm text-gray-400">No downloads available</p>';
+            }
+
+            let buttons = '';
+
+            if (job.job_type === 'split' && job.result_data) {
+                buttons = '<button onclick="returnToSplitWorkspace(' + job.id + ')" class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors">View Split Files</button>';
+            } else if (job.job_type === 'tagging') {
+                buttons = '<a href="' + API_BASE_URL + '/export_xml" download class="inline-block px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors">Download Tagged Library</a>';
+            }
+
+            return buttons;
+        }
+
+        function returnToSplitWorkspace(jobId) {
+            sessionStorage.setItem('restoreJobId', jobId);
+            window.location.href = 'workspace.html';
+        }
+
+        function createJobCard(job) {
+            const card = document.createElement('div');
+            card.className = 'job-card p-6 bg-white bg-opacity-10 backdrop-blur-lg rounded-lg border border-white border-opacity-20';
+
+            const jobTypeLabel = job.job_type === 'split' ? 'Split Library' :
+                                job.job_type === 'tagging' ? 'Tag Library' : 'Job';
+
+            const trackInfo = job.track_count ?
+                '<p class="text-sm text-gray-300 mt-1">' + job.track_count + ' tracks processed</p>' : '';
+
+            card.innerHTML = '<div class="flex justify-between items-start mb-3"><div class="flex-1"><h3 class="text-lg font-semibold text-white">' + (job.job_display_name || job.original_filename) + '</h3><p class="text-sm text-gray-400 mt-1">' + formatTimestamp(job.timestamp) + '</p>' + trackInfo + '</div><div class="ml-4">' + getStatusBadge(job.status) + '</div></div><div class="flex items-center justify-between pt-3 border-t border-white border-opacity-10"><span class="text-xs text-gray-400 uppercase tracking-wider">' + jobTypeLabel + '</span><div class="flex gap-2">' + createDownloadButtons(job) + '</div></div>';
+
+            return card;
+        }
+
         async function fetchAndDisplayHistory() {
             try {
-                // Call the backend endpoint to get the action logs
-                const response = await fetch('http://127.0.0.1:5001/get_actions');
+                const response = await fetch(API_BASE_URL + '/history');
 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    throw new Error('HTTP error! status: ' + response.status);
                 }
 
-                const actions = await response.json(); // Parse the JSON response
+                const jobs = await response.json();
 
-                loadingMessage.classList.add('hidden'); // Hide loading message
+                loadingMessage.classList.add('hidden');
 
-                if (actions.length === 0) {
-                    historyList.innerHTML = '<li class="text-gray-500">No actions logged yet.</li>';
+                if (!jobs || jobs.length === 0) {
+                    emptyMessage.classList.remove('hidden');
                     return;
                 }
 
-                // Clear any previous items (though unlikely needed on first load)
-                historyList.innerHTML = '';
+                historyContainer.classList.remove('hidden');
+                historyContainer.innerHTML = '';
 
-                // Loop through each action and create a list item
-                actions.forEach(action => {
-                    const li = document.createElement('li');
-                    li.className = 'p-3 bg-gray-50 rounded-lg text-sm';
-
-                    // Format the timestamp (basic ISO format for now)
-                    const timestamp = new Date(action.timestamp).toLocaleString();
-
-                    li.textContent = `[${timestamp}] ${action.description}`;
-                    historyList.appendChild(li);
+                jobs.forEach(function(job) {
+                    const card = createJobCard(job);
+                    historyContainer.appendChild(card);
                 });
 
             } catch (error) {
                 console.error('Error fetching history:', error);
-                loadingMessage.classList.add('hidden'); // Hide loading
-                errorMessage.classList.remove('hidden'); // Show error
+                loadingMessage.classList.add('hidden');
+                errorMessage.classList.remove('hidden');
             }
         }
 
-        // Run the function when the page finishes loading
-        document.addEventListener('DOMContentLoaded', fetchAndDisplayHistory);
+        async function checkForActiveJobs() {
+            try {
+                const response = await fetch(API_BASE_URL + '/history');
+                if (response.ok) {
+                    const jobs = await response.json();
+                    const hasActiveJobs = jobs.some(function(job) { return job.status === 'In Progress'; });
+
+                    if (hasActiveJobs) {
+                        fetchAndDisplayHistory();
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking for active jobs:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const video = document.getElementById('vj-background');
+            if (video) {
+                video.pause();
+            }
+
+            fetchAndDisplayHistory();
+            setInterval(checkForActiveJobs, 5000);
+        });
     </script>
 </body>
 </html>

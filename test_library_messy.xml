@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DJ_PLAYLISTS Version="1.0.0">
+  <PRODUCT Name="rekordbox" Version="6.5.3" Company="AlphaTheta"/>
+  <COLLECTION Entries="15">
+    <!-- Test 1: Clean Electronic -->
+    <TRACK TrackID="1" Name="Strobe" Artist="deadmau5" Genre="Progressive House" AverageBpm="128.00" Comments="A classic.">
+      <LOCATION Dir="/Users/test/Music/" File="deadmau5 - Strobe.mp3"/>
+    </TRACK>
+
+    <!-- Test 2: Missing Genre (Tests AI Fallback) -->
+    <TRACK TrackID="2" Name="A New Error" Artist="Moderat" Genre="" AverageBpm="120.00" Comments="">
+      <LOCATION Dir="/Users/test/Music/" File="Moderat - A New Error.mp3"/>
+    </TRACK>
+
+    <!-- Test 3: Clean Hip Hop -->
+    <TRACK TrackID="3" Name="Can I Kick It?" Artist="A Tribe Called Quest" Genre="Hip Hop" AverageBpm="97.00" Comments="">
+      <LOCATION Dir="/Users/test/Music/" File="A Tribe Called Quest - Can I Kick It.mp3"/>
+    </TRACK>
+
+    <!-- Test 4: Red Color Override Test -->
+    <TRACK TrackID="4" Name="Cirrus" Artist="Bonobo" Genre="Downtempo" AverageBpm="118.00" Colour="0xFF0000" Comments="Marked for review">
+      <LOCATION Dir="/Users/test/Music/" File="Bonobo - Cirrus.mp3"/>
+    </TRACK>
+
+    <!-- Test 5: Clean House -->
+    <TRACK TrackID="5" Name="One More Time" Artist="Daft Punk" Genre="House" AverageBpm="123.00" Comments="">
+      <LOCATION Dir="/Users/test/Music/" File="Daft Punk - One More Time.mp3"/>
+    </TRACK>
+
+    <!-- Test 6: Missing Genre (Tests AI Fallback) -->
+    <TRACK TrackID="6" Name="Midnight City" Artist="M83" Genre="" AverageBpm="105.00" Comments="">
+      <LOCATION Dir="/Users/test/Music/" File="M83 - Midnight City.mp3"/>
+    </TRACK>
+
+    <!-- Test 7: Messy Genre (Tests Parser) -->
+    <TRACK TrackID="7" Name="Your Mind" Artist="Adam Beyer & Bart Skils" Genre="Techno / Peak Time" AverageBpm="126.00" Comments="">
+      <LOCATION Dir="/Users/test/Music/" File="Adam Beyer - Your Mind.mp3"/>
+    </TRACK>
+
+    <!-- Test 8: Clean Funk/Soul -->
+    <TRACK TrackID="8" Name="Move On Up" Artist="Curtis Mayfield" Genre="Funk / Soul" AverageBpm="142.00" Comments="">
+      <LOCATION Dir="/Users/test/Music/" File="Curtis Mayfield - Move On Up.mp3"/>
+    </TRACK>
+
+    <!-- Test 9: Missing Genre (Tests AI Fallback) -->
+    <TRACK TrackID="9" Name="Breathe" Artist="The Prodigy" Genre="" AverageBpm="130.00" Comments="">
+      <LOCATION Dir="/Users/test/Music/" File="The Prodigy - Breathe.mp3"/>
+    </gRACK>
+
+    <!-- Test 10: Messy Genre (Tests Parser) -->
+    <TRACK TrackID="10" Name="Voodoo People (Pendulum Remix)" Artist="The Prodigy" Genre="Drum & Bass,Neurofunk" AverageBpm="174.00" Comments="">
+      <LOCATION Dir="/Users/test/Music/" File="The Prodigy - Voodoo People (Pendulum Remix).mp3"/>
+    </TRACK>
+
+    <!-- Test 11: Missing Genre (Tests AI Fallback) -->
+    <TRACK TrackID="11" Name="Royals" Artist="Lorde" Genre="" AverageBpm="85.00" Comments="">
+      <LOCATION Dir="/Users/test/Music/" File="Lorde - Royals.mp3"/>
+    </TRACK>
+
+    <!-- Test 12: Clean Techno -->
+    <TRACK TrackID="12" Name="Conjure Dreams" Artist="Maceo Plex" Genre="Techno" AverageBpm="124.00" Comments="">
+      <LOCATION Dir="/Users/test/Music/" File="Maceo Plex - Conjure Dreams.mp3"/>
+    </TRACK>
+
+    <!-- Test 13: Clean Misc Genre (Rock) -->
+    <TRACK TrackID="13" Name="Everlong" Artist="Foo Fighters" Genre="Rock" AverageBpm="158.00" Comments="">
+      <LOCATION Dir="/Users/test/Music/" File="Foo Fighters - Everlong.mp3"/>
+    </gRACK>
+
+    <!-- Test 14: Missing Genre (Tests AI Fallback) -->
+    <TRACK TrackID="14" Name="Teardrop" Artist="Massive Attack" Genre="" AverageBpm="87.00" Comments="">
+      <LOCATION Dir="/Users/test/Music/" File="Massive Attack - Teardrop.mp3"/>
+    </TRACK>
+
+    <!-- Test 15: Clean Misc Genre (Reggae) -->
+    <TRACK TrackID="15" Name="Three Little Birds" Artist="Bob Marley & The Wailers" Genre="Reggae" AverageBpm="76.00" Comments="">
+      <LOCATION Dir="/Users/test/Music/" File="Bob Marley - Three Little Birds.mp3"/>
+    </TRACK>
+  </COLLECTION>
+</DJ_PLAYLISTS>
