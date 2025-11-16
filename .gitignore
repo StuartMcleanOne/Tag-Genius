@@ -14,4 +14,7 @@ outputs/
 
 # Environment
 .env
-venv/
+venv/*.log
+flask_errors.txt
+*.mp4
+*.png
