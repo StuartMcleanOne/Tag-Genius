@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 1. GLOBAL STATE & CONFIG ---
     let uploadedFile = null;
     let isProcessingJob = false;
+    let currentJobId = null;  // Track current job ID for cancellation
     const API_BASE_URL = 'http://127.0.0.1:5001';
 
     const tagConfigurations = {
@@ -191,7 +192,26 @@ document.addEventListener('DOMContentLoaded', () => {
         setVideoProcessing(false);
     }
 
-    function cancelCurrentJob() {
+    async function cancelCurrentJob() {
+        if (!currentJobId) {
+            console.log('No active job to cancel');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/cancel_job/${currentJobId}`, {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                console.log('Job cancelled successfully');
+                logAction(`User cancelled job ID ${currentJobId}`);
+            }
+        } catch (error) {
+            console.error('Failed to cancel job:', error);
+        }
+
+        // Clear polling intervals
         if (window.pollingIntervalId) {
             clearInterval(window.pollingIntervalId);
         }
@@ -199,10 +219,11 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(window.splitPollingIntervalId);
         }
 
+        // Reset state
+        currentJobId = null;
         isProcessingJob = false;
         hideStatus();
         if (statusText) statusText.textContent = 'Job cancelled by user.';
-        logAction('User cancelled job in progress');
     }
 
     function displayMainTagResult(jobDisplayName, isClearJob = false) {
@@ -306,6 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
 
             if (response.status === 202 && result.job_id) {
+                currentJobId = result.job_id;  // Store job ID for cancellation
                 if (jobType === 'split') {
                     pollSplitJobStatus(result.job_id);
                 } else {
