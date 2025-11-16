@@ -1,5 +1,5 @@
 import os
-import sqlite3
+import psycopg2
 import xml.etree.ElementTree as ET
 import json
 import requests
@@ -13,7 +13,9 @@ from flask_cors import CORS
 from celery import Celery
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-
+from psycopg2.extras import RealDictCursor
+import warnings
+warnings.filterwarnings('ignore', message='.*supautils.*')
 
 # --- SETUP ---
 
@@ -83,11 +85,12 @@ MASTER_BLUEPRINT_CONFIG = {
 # --- DATABASE FUNCTIONS ---
 
 def get_db_connection():
-    """Establishes and returns a connection to the SQLite database."""
-    conn = sqlite3.connect('tag_genius.db')
-    conn.row_factory = sqlite3.Row
+    """Establishes and returns a connection to the PostgreSQL database."""
+    database_url = os.environ.get('DATABASE_URL')
+    if not database_url:
+        raise ValueError("DATABASE_URL environment variable not set")
+    conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
     return conn
-
 
 @contextmanager
 def db_cursor():
@@ -97,95 +100,95 @@ def db_cursor():
     try:
         yield cursor
         conn.commit()
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         conn.rollback()
-        print(f"Database transaction failed: {e}")
+        print(f"Database transaction failed:{e}")
         raise e
     finally:
+        cursor.close()
         conn.close()
 
-
-@app.cli.command('init-db')
-def init_db():
-    """Initialize the database with all required tables."""
-    try:
-        with db_cursor() as cursor:
-            # Tracks Table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS tracks (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    artist TEXT,
-                    bpm REAL,
-                    tonality TEXT,
-                    genre TEXT,
-                    label TEXT,
-                    comments TEXT,
-                    grouping TEXT,
-                    tags_json TEXT
-                );
-            """)
-            # Tags Table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS tags (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL UNIQUE
-                );
-            """)
-            # Track_tags Link Table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS track_tags (
-                    track_id INTEGER,
-                    tag_id INTEGER,
-                    FOREIGN KEY (track_id) REFERENCES tracks (id)
-                        ON DELETE CASCADE,
-                    FOREIGN KEY (tag_id) REFERENCES tags (id)
-                        ON DELETE CASCADE,
-                    PRIMARY KEY (track_id, tag_id)
-                );
-            """)
-            # Processing_log Table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS processing_log (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    job_display_name TEXT,
-                    original_filename TEXT NOT NULL,
-                    input_file_path TEXT,
-                    output_file_path TEXT,
-                    track_count INTEGER,
-                    status TEXT NOT NULL,
-                    job_type TEXT NOT NULL,
-                    result_data TEXT
-                );
-            """)
-            # User_actions Table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS user_actions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    action_description TEXT NOT NULL
-                );
-            """)
-        print('Database with all tables initialized successfully.')
-    except sqlite3.Error as e:
-        print(f"Database initialisation failed: {e}")
-
-
-@app.cli.command('drop-tables')
-def drop_tables():
-    """Drop all application tables from the database."""
-    try:
-        with db_cursor() as cursor:
-            print("Dropping all application tables...")
-            cursor.execute("DROP TABLE IF EXISTS track_tags")
-            cursor.execute("DROP TABLE IF EXISTS tags")
-            cursor.execute("DROP TABLE IF EXISTS tracks")
-            cursor.execute("DROP TABLE IF EXISTS processing_log")
-            cursor.execute("DROP TABLE IF EXISTS user_actions")
-            print("All application tables dropped successfully.")
-    except sqlite3.Error as e:
-        print(f"Failed to drop tables: {e}")
+# @app.cli.command('init-db')
+# def init_db():
+#     """Initialize the database with all required tables."""
+#     try:
+#         with db_cursor() as cursor:
+#             # Tracks Table
+#             cursor.execute("""
+#                 CREATE TABLE IF NOT EXISTS tracks (
+#                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                     name TEXT NOT NULL,
+#                     artist TEXT,
+#                     bpm REAL,
+#                     tonality TEXT,
+#                     genre TEXT,
+#                     label TEXT,
+#                     comments TEXT,
+#                     grouping TEXT,
+#                     tags_json TEXT
+#                 );
+#             """)
+#             # Tags Table
+#             cursor.execute("""
+#                 CREATE TABLE IF NOT EXISTS tags (
+#                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                     name TEXT NOT NULL UNIQUE
+#                 );
+#             """)
+#             # Track_tags Link Table
+#             cursor.execute("""
+#                 CREATE TABLE IF NOT EXISTS track_tags (
+#                     track_id INTEGER,
+#                     tag_id INTEGER,
+#                     FOREIGN KEY (track_id) REFERENCES tracks (id)
+#                         ON DELETE CASCADE,
+#                     FOREIGN KEY (tag_id) REFERENCES tags (id)
+#                         ON DELETE CASCADE,
+#                     PRIMARY KEY (track_id, tag_id)
+#                 );
+#             """)
+#             # Processing_log Table
+#             cursor.execute("""
+#                 CREATE TABLE IF NOT EXISTS processing_log (
+#                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+#                     job_display_name TEXT,
+#                     original_filename TEXT NOT NULL,
+#                     input_file_path TEXT,
+#                     output_file_path TEXT,
+#                     track_count INTEGER,
+#                     status TEXT NOT NULL,
+#                     job_type TEXT NOT NULL,
+#                     result_data TEXT
+#                 );
+#             """)
+#             # User_actions Table
+#             cursor.execute("""
+#                 CREATE TABLE IF NOT EXISTS user_actions (
+#                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+#                     action_description TEXT NOT NULL
+#                 );
+#             """)
+#         print('Database with all tables initialized successfully.')
+#     except psycopg2.Error as e:
+#         print(f"Database initialisation failed: {e}")
+#
+#
+# @app.cli.command('drop-tables')
+# def drop_tables():
+#     """Drop all application tables from the database."""
+#     try:
+#         with db_cursor() as cursor:
+#             print("Dropping all application tables...")
+#             cursor.execute("DROP TABLE IF EXISTS track_tags")
+#             cursor.execute("DROP TABLE IF EXISTS tags")
+#             cursor.execute("DROP TABLE IF EXISTS tracks")
+#             cursor.execute("DROP TABLE IF EXISTS processing_log")
+#             cursor.execute("DROP TABLE IF EXISTS user_actions")
+#             print("All application tables dropped successfully.")
+#     except psycopg2.Error as e:
+#         print(f"Failed to drop tables: {e}")
 
 
 def get_track_blueprint(name, artist):
@@ -193,14 +196,14 @@ def get_track_blueprint(name, artist):
     try:
         with db_cursor() as cursor:
             cursor.execute(
-                "SELECT tags_json FROM tracks WHERE name = ? AND artist = ?",
+                "SELECT tags_json FROM tracks WHERE name = %s AND artist = %s",
                 (name, artist)
             )
             result = cursor.fetchone()
 
             if result and result['tags_json']:
                 return json.loads(result['tags_json'])
-    except (sqlite3.Error, json.JSONDecodeError) as e:
+    except (psycopg2.Error, json.JSONDecodeError) as e:
         print(f"Error retrieving blueprint for {artist} - {name}: {e}")
     return None
 
@@ -231,7 +234,7 @@ def insert_track_data(name, artist, bpm, tonality, genre, label, comments,
     try:
         with db_cursor() as cursor:
             cursor.execute(
-                "SELECT id FROM tracks WHERE name = ? AND artist = ?",
+                "SELECT id FROM tracks WHERE name = %s AND artist = %s",
                 (name, artist)
             )
             existing_track = cursor.fetchone()
@@ -247,18 +250,18 @@ def insert_track_data(name, artist, bpm, tonality, genre, label, comments,
                 if tags_json_string is not None:
                     cursor.execute(
                         """UPDATE tracks
-                           SET bpm = ?, tonality = ?, genre = ?, label = ?,
-                               comments = ?, grouping = ?, tags_json = ?
-                           WHERE id = ?""",
+                           SET bpm = %s, tonality = %s, genre = %s, label = %s,
+                               comments = %s, grouping = %s, tags_json = %s
+                           WHERE id = %s""",
                         (bpm, tonality, genre, label, comments, grouping,
                          tags_json_string, track_id)
                     )
                 else:
                     cursor.execute(
                         """UPDATE tracks
-                           SET bpm = ?, tonality = ?, genre = ?, label = ?,
-                               comments = ?, grouping = ?
-                           WHERE id = ?""",
+                           SET bpm = %s, tonality = %s, genre = %s, label = %s,
+                               comments = %s, grouping = %s
+                           WHERE id = %s""",
                         (bpm, tonality, genre, label, comments, grouping,
                          track_id)
                     )
@@ -268,11 +271,12 @@ def insert_track_data(name, artist, bpm, tonality, genre, label, comments,
                     """INSERT INTO tracks
                        (name, artist, bpm, tonality, genre, label, comments,
                         grouping, tags_json)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
                     (name, artist, bpm, tonality, genre, label, comments,
                      grouping, tags_json_string)
                 )
-                track_id = cursor.lastrowid
+                result = cursor.fetchone()
+                track_id = result['id'] if result else None
                 print(f"Successfully inserted track ID: {track_id}")
 
             # Process and link tags
@@ -292,30 +296,32 @@ def insert_track_data(name, artist, bpm, tonality, genre, label, comments,
             tag_ids = []
             for tag_name in all_tags:
                 cursor.execute(
-                    "SELECT id FROM tags WHERE name = ?",
+                    "SELECT id FROM tags WHERE name = %s",
                     (tag_name,)
                 )
                 tag_row = cursor.fetchone()
                 tag_id = tag_row['id'] if tag_row else None
                 if not tag_id:
                     cursor.execute(
-                        "INSERT INTO tags (name) VALUES (?)",
+                        "INSERT INTO tags (name) VALUES (%s) RETURNING id",
                         (tag_name,)
                     )
-                    tag_id = cursor.lastrowid
+                    result = cursor.fetchone()
+                    tag_id = result['id'] if result else None
                 tag_ids.append(tag_id)
 
             if tag_ids:
                 values_to_insert = [(track_id, tag_id) for tag_id in tag_ids]
                 cursor.executemany(
-                    "INSERT OR IGNORE INTO track_tags "
-                    "(track_id, tag_id) VALUES (?, ?)",
+                    "INSERT INTO track_tags "
+                    "(track_id, tag_id) VALUES (%s, %s) "
+                    "ON CONFLICT DO NOTHING",
                     values_to_insert
                 )
 
             print(f"Database record updated for track ID {track_id}.")
 
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print(f"Database error in insert_track_data for "
               f"{artist} - {name}: {e}")
 
@@ -327,12 +333,13 @@ def log_job_start(filename, input_path, job_type, job_display_name):
             cursor.execute(
                 "INSERT INTO processing_log "
                 "(original_filename, input_file_path, status, job_type, "
-                "job_display_name) VALUES (?, ?, ?, ?, ?)",
+                "job_display_name) VALUES (%s, %s, %s, %s, %s) RETURNING id",
                 (filename, input_path, 'In Progress', job_type,
                  job_display_name)
             )
-            return cursor.lastrowid
-    except sqlite3.Error as e:
+            result = cursor.fetchone()
+            return result['id'] if result else None
+    except psycopg2.Error as e:
         print(f"Failed to create log entry for {filename}: {e}")
         return None
 
@@ -343,13 +350,13 @@ def log_job_end(log_id, status, track_count, output_path):
         with db_cursor() as cursor:
             cursor.execute(
                 "UPDATE processing_log "
-                "SET status = ?, track_count = ?, output_file_path = ? "
-                "WHERE id = ?",
+                "SET status = %s, track_count = %s, output_file_path = %s "
+                "WHERE id = %s",
                 (status, track_count, output_path, log_id)
             )
             print(f"Finished logging for job ID: {log_id} "
                   f"with status: {status}")
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print(f"Failed to update log entry for job ID {log_id}: {e}")
 
 
@@ -369,7 +376,7 @@ def cleanup_stale_jobs():
             # Find stale jobs first (for logging)
             cursor.execute(
                 "SELECT id, job_display_name FROM processing_log "
-                "WHERE status = 'In Progress' AND timestamp < ?",
+                        "WHERE status = 'In Progress' AND timestamp < %s",
                 (cutoff_time,)
             )
             stale_jobs = cursor.fetchall()
@@ -380,17 +387,19 @@ def cleanup_stale_jobs():
                     print(f"   - Job {job['id']}: {job['job_display_name']}")
 
                 # Mark them as failed
-                cursor.execute(
-                    "UPDATE processing_log SET status = 'Failed' "
-                    "WHERE status = 'In Progress' AND timestamp < ?",
-                    (cutoff_time,)
-                )
-                print(f"✅ Marked {len(stale_jobs)} stale job(s) as 'Failed'\n")
+                cursor.execute("""
+                               UPDATE processing_log
+                               SET status = 'Failed'
+                               WHERE status = 'In Progress'
+                                 AND timestamp
+                                   < %s
+                               """, (cutoff_time,))
+                print(f" Marked {len(stale_jobs)} stale job(s) as 'Failed'\n")
             else:
-                print("✅ No stale jobs to clean up\n")
+                print(" No stale jobs to clean up\n")
 
-    except sqlite3.Error as e:
-        print(f"⚠️  Failed to clean up stale jobs: {e}\n")
+    except psycopg2.Error as e:
+        print(f"  Failed to clean up stale jobs: {e}\n")
 
 
 def call_llm_for_tags(track_data, config, mode='full'):
@@ -817,8 +826,8 @@ def split_library_task(log_id, input_path, job_folder_path):
         with db_cursor() as cursor:
             cursor.execute(
                 "UPDATE processing_log "
-                "SET status = ?, result_data = ?, track_count = ? "
-                "WHERE id = ?",
+                "SET status = %s, result_data = %s, track_count = %s "
+                "WHERE id = %s",
                 ('Completed', result_json, len(created_files), log_id)
             )
         print(f"Split job {log_id} completed successfully.")
@@ -828,7 +837,7 @@ def split_library_task(log_id, input_path, job_folder_path):
         print(f"FATAL error during split job {log_id}: {e}")
         with db_cursor() as cursor:
             cursor.execute(
-                "UPDATE processing_log SET status = ? WHERE id = ?",
+                "UPDATE processing_log SET status = %s WHERE id = %s",
                 ('Failed', log_id)
             )
         return {"error": str(e)}
@@ -856,6 +865,19 @@ def process_library_task(log_id, input_path, output_path, config):
             artist = track.get('Artist')
             print(f"\nProcessing track {index + 1}/{total_tracks}: "
                   f"{artist} - {track_name}")
+
+            # Check if job was cancelled
+            with db_cursor() as cursor:
+                cursor.execute(
+                    "SELECT status FROM processing_log WHERE id = %s",
+                    (log_id,)
+                )
+                result = cursor.fetchone()
+                if result and result['status'] == 'Cancelled':
+                    print(f"\nJob {log_id} was cancelled by user. Stopping.")
+                    tree.write(output_path, encoding='UTF-8', xml_declaration=True)
+                    log_job_end(log_id, 'Cancelled', index, output_path)
+                    return {"message": "Job was cancelled", "tracks_processed": index}
 
             # Handle "Clear Tags" Mode
             if config.get('level') == 'Clear':
@@ -1039,12 +1061,6 @@ def process_library_task(log_id, input_path, output_path, config):
 
 
 # --- FLASK ROUTES ---
-
-@app.route('/')
-def hello_ai():
-    """Confirm server is running."""
-    return 'Hello, Tag Genius!'
-
 
 @app.route('/upload_library', methods=['POST'])
 def upload_library():
@@ -1320,11 +1336,12 @@ def download_job_package(job_id):
     original_filename = f"job_{job_id}_files"
     try:
         with db_cursor() as cursor:
-            log_entry = cursor.execute(
+            cursor.execute(
                 "SELECT original_filename, input_file_path, "
-                "output_file_path FROM processing_log WHERE id = ?",
+                "output_file_path FROM processing_log WHERE id = %s",
                 (job_id,)
-            ).fetchone()
+            )
+            log_entry = cursor.fetchone()
 
         if not log_entry:
             return jsonify({"error": f"Job ID {job_id} not found"}), 404
@@ -1361,7 +1378,7 @@ def download_job_package(job_id):
             download_name=(f'tag_genius_job_{job_id}_'
                            f'{original_filename}_archive.zip')
         )
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print(f"Database error finding job {job_id}: {e}")
         return jsonify({
             "error": "Database error retrieving job details."
@@ -1409,7 +1426,7 @@ def export_xml():
                          "missing on server."
             }), 404
 
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print(f"Database error during export lookup: {e}")
         return jsonify({
             "error": "Database error retrieving file path."
@@ -1421,12 +1438,13 @@ def get_history():
     """Retrieve log of all past jobs."""
     try:
         with db_cursor() as cursor:
-            logs = cursor.execute(
+            cursor.execute(
                 "SELECT * FROM processing_log ORDER BY timestamp DESC"
-            ).fetchall()
+            )
+            logs = cursor.fetchall()
         history_list = [dict(row) for row in logs]
         return jsonify(history_list)
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print(f"Database error in get_history: {e}")
         return jsonify({"error": "Failed to retrieve job history"}), 500
 
@@ -1447,11 +1465,11 @@ def log_action():
     try:
         with db_cursor() as cursor:
             cursor.execute(
-                "INSERT INTO user_actions (action_description) VALUES (?)",
+                "INSERT INTO user_actions (action_description) VALUES (%s)",
                 (description,)
             )
         return jsonify({"message": "Action logged successfully"}), 201
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print(f"Database error logging action: {description} - {e}")
         return jsonify({
             "error": "Failed to log action due to database error"
@@ -1463,10 +1481,11 @@ def get_actions():
     """Retrieve all logged user actions."""
     try:
         with db_cursor() as cursor:
-            actions = cursor.execute(
+            cursor.execute(
                 "SELECT timestamp, action_description FROM user_actions "
                 "ORDER BY timestamp DESC"
-            ).fetchall()
+            )
+            actions = cursor.fetchall()
         action_list = [
             {
                 "timestamp": row['timestamp'],
@@ -1475,11 +1494,52 @@ def get_actions():
             for row in actions
         ]
         return jsonify(action_list)
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         print(f"Database error retrieving actions: {e}")
         return jsonify({
             "error": "Failed to retrieve actions due to database error"
         }), 500
+
+
+@app.route('/cancel_job/<int:job_id>', methods=['POST'])
+def cancel_job(job_id):
+    """Cancel a running Celery job."""
+    try:
+        # Mark job as cancelled in database
+        with db_cursor() as cursor:
+            cursor.execute(
+                "UPDATE processing_log SET status = %s WHERE id = %s",
+                ('Cancelled', job_id)
+            )
+
+        # Revoke the Celery task (requires task_id, which we don't store)
+        # For now, just mark as cancelled in DB
+        # The Celery task will check status and stop
+
+        return jsonify({"message": "Job cancelled"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# --- STATIC FILE ROUTES (MUST BE LAST) ---
+
+@app.route('/')
+def landing_page():
+    """Future: Login/dashboard landing page."""
+    return 'Hello, Tag Genius!'
+
+
+@app.route('/app')
+def serve_app():
+    """Main Tag Genius application interface."""
+    return send_file('index.html')
+
+
+@app.route('/<path:path>')
+def serve_static(path):
+    """Serve static files (HTML, CSS, JS, images, videos)."""
+    if os.path.exists(path):
+        return send_file(path)
+    return "File not found", 404
 
 
 # --- Main Execution Guard ---
