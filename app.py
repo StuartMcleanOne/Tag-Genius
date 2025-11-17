@@ -1493,6 +1493,22 @@ def get_actions():
             "error": "Failed to retrieve actions due to database error"
         }), 500
 
+@app.route('/app')
+def serve_index():
+    return send_file('index.html')
+
+@app.route('/history')
+def serve_history():
+    return send_file('history.html')
+
+@app.route('/workspace')
+def serve_workspace():
+    return send_file('workspace.html')
+
+# Serve static files (CSS, JS, etc.)
+@app.route('/<path:path>')
+def serve_static(path):
+    return send_file(path)
 
 # --- Main Execution Guard ---
 if __name__ == '__main__':
