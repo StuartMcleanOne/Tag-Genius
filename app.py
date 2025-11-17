@@ -24,6 +24,9 @@ app = Flask(__name__)
 # Configure Celery to use Redis as the message broker and result backend
 app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'
 app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
+app.config['CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP'] = True
+app.config['broker_use_ssl'] = {'ssl_cert_reqs': 'none'}
+app.config['redis_backend_use_ssl'] = {'ssl_cert_reqs': 'none'}
 
 # Initialize Celery
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
