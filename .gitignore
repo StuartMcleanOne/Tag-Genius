@@ -16,5 +16,5 @@ outputs/
 .env
 venv/*.log
 flask_errors.txt
-*.mp4
 *.png
+vj_loop_10_compressed.mp4
