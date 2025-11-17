@@ -23,14 +23,14 @@ if [ "$confirm" = "yes" ]; then
     source venv/bin/activate
     python3 -c "
 import os
-import psycopg2
+import psycopg
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
     print('ERROR: DATABASE_URL not found in environment')
     exit(1)
 
-conn = psycopg2.connect(DATABASE_URL)
+conn = psycopg.connect(DATABASE_URL)
 cursor = conn.cursor()
 
 print('Dropping existing tables...')

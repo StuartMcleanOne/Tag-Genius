@@ -30,9 +30,9 @@ celery = Celery(app.name, broker=app.config['broker_url'])
 celery.conf.update(app.config)
 
 # SSL Config for Upstash Redis
-celery.conf.broker_connection_retry_on_startup = True
-celery.conf.broker_use_ssl = {'ssl_cert_reqs': 'none'}
-celery.conf.redis_backend_use_ssl = {'ssl_cert_reqs': 'none'}
+# celery.conf.broker_connection_retry_on_startup = True
+# celery.conf.broker_use_ssl = {'ssl_cert_reqs': 'none'}
+# celery.conf.redis_backend_use_ssl = {'ssl_cert_reqs': 'none'}
 
 # Enable Cross-Origin Resource Sharing (CORS) for frontend communication
 CORS(app)
@@ -305,10 +305,11 @@ def insert_track_data(name, artist, bpm, tonality, genre, label, comments,
                 tag_id = tag_row['id'] if tag_row else None
                 if not tag_id:
                     cursor.execute(
-                        "INSERT INTO tags (name) VALUES (%s)",
+                        "INSERT INTO tags (name) VALUES (%s) RETURNING id",
                         (tag_name,)
                     )
-                    tag_id = cursor.fetchone()['id']
+                    result = cursor.fetchone()
+                    tag_id = result['id'] if result else None
                 tag_ids.append(tag_id)
 
             if tag_ids:
@@ -334,11 +335,12 @@ def log_job_start(filename, input_path, job_type, job_display_name):
             cursor.execute(
                 "INSERT INTO processing_log "
                 "(original_filename, input_file_path, status, job_type, "
-                "job_display_name) VALUES (%s, %s, %s, %s, %s)",
+                "job_display_name) VALUES (%s, %s, %s, %s, %s) RETURNING id",
                 (filename, input_path, 'In Progress', job_type,
                  job_display_name)
             )
-            return cursor.fetchone()['id']
+            result = cursor.fetchone()
+            return result['id'] if result else None
     except psycopg.Error as e:
         print(f"Failed to create log entry for {filename}: {e}")
         return None
