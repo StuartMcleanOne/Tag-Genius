@@ -1,5 +1,5 @@
 import os
-import psycopg
+import psycopg2
 import xml.etree.ElementTree as ET
 import json
 import requests
@@ -13,6 +13,7 @@ from flask_cors import CORS
 from celery import Celery
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from psycopg2.extras import RealDictCursor
 
 # --- SETUP ---
 
@@ -22,15 +23,17 @@ load_dotenv()
 app = Flask(__name__)
 
 # Configure Celery to use Redis as the message broker and result backend
-app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'
-app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
-app.config['CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP'] = True
-app.config['broker_use_ssl'] = {'ssl_cert_reqs': 'none'}
-app.config['redis_backend_use_ssl'] = {'ssl_cert_reqs': 'none'}
+app.config['CELERY_BROKER_URL'] = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+app.config['CELERY_RESULT_BACKEND'] = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
 
 # Initialize Celery
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
 celery.conf.update(app.config)
+
+# SSL Config for Upstash Redis
+celery.conf.broker_connection_retry_on_startup = True
+celery.conf.broker_use_ssl = {'ssl_cert_reqs': 'none'}
+celery.conf.redis_backend_use_ssl = {'ssl_cert_reqs': 'none'}
 
 # Enable Cross-Origin Resource Sharing (CORS) for frontend communication
 CORS(app)
@@ -89,7 +92,7 @@ def get_db_connection():
     database_url = os.environ.get('DATABASE_URL')
     if not database_url:
         raise ValueError("DATABASE_URL environment variable not set")
-    conn = psycopg.connect(database_url, row_factory=psycopg.rows.dict_row)
+    conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
     return conn
 
 @contextmanager
@@ -100,7 +103,7 @@ def db_cursor():
     try:
         yield cursor
         conn.commit()
-    except psycopg.Error as e:
+    except psycopg2.Error as e:
         conn.rollback()
         print(f"Database transaction failed:{e}")
         raise e
@@ -171,7 +174,7 @@ def db_cursor():
 #                 );
 #             """)
 #         print('Database with all tables initialized successfully.')
-#     except psycopg.Error as e:
+#     except psycopg2.Error as e:
 #         print(f"Database initialisation failed: {e}")
 #
 #
@@ -187,7 +190,7 @@ def db_cursor():
 #             cursor.execute("DROP TABLE IF EXISTS processing_log")
 #             cursor.execute("DROP TABLE IF EXISTS user_actions")
 #             print("All application tables dropped successfully.")
-#     except psycopg.Error as e:
+#     except psycopg2.Error as e:
 #         print(f"Failed to drop tables: {e}")
 
 
@@ -203,7 +206,7 @@ def get_track_blueprint(name, artist):
 
             if result and result['tags_json']:
                 return json.loads(result['tags_json'])
-    except (psycopg.Error, json.JSONDecodeError) as e:
+    except (psycopg2.Error, json.JSONDecodeError) as e:
         print(f"Error retrieving blueprint for {artist} - {name}: {e}")
     return None
 
@@ -319,7 +322,7 @@ def insert_track_data(name, artist, bpm, tonality, genre, label, comments,
 
             print(f"Database record updated for track ID {track_id}.")
 
-    except psycopg.Error as e:
+    except psycopg2.Error as e:
         print(f"Database error in insert_track_data for "
               f"{artist} - {name}: {e}")
 
@@ -336,7 +339,7 @@ def log_job_start(filename, input_path, job_type, job_display_name):
                  job_display_name)
             )
             return cursor.lastrowid
-    except psycopg.Error as e:
+    except psycopg2.Error as e:
         print(f"Failed to create log entry for {filename}: {e}")
         return None
 
@@ -353,7 +356,7 @@ def log_job_end(log_id, status, track_count, output_path):
             )
             print(f"Finished logging for job ID: {log_id} "
                   f"with status: {status}")
-    except psycopg.Error as e:
+    except psycopg2.Error as e:
         print(f"Failed to update log entry for job ID {log_id}: {e}")
 
 
@@ -395,7 +398,7 @@ def cleanup_stale_jobs():
             else:
                 print(" No stale jobs to clean up\n")
 
-    except psycopg.Error as e:
+    except psycopg2.Error as e:
         print(f"  Failed to clean up stale jobs: {e}\n")
 
 
@@ -1368,7 +1371,7 @@ def download_job_package(job_id):
             download_name=(f'tag_genius_job_{job_id}_'
                            f'{original_filename}_archive.zip')
         )
-    except psycopg.Error as e:
+    except psycopg2.Error as e:
         print(f"Database error finding job {job_id}: {e}")
         return jsonify({
             "error": "Database error retrieving job details."
@@ -1416,7 +1419,7 @@ def export_xml():
                          "missing on server."
             }), 404
 
-    except psycopg.Error as e:
+    except psycopg2.Error as e:
         print(f"Database error during export lookup: {e}")
         return jsonify({
             "error": "Database error retrieving file path."
@@ -1434,7 +1437,7 @@ def get_history():
             logs = cursor.fetchall()
         history_list = [dict(row) for row in logs]
         return jsonify(history_list)
-    except psycopg.Error as e:
+    except psycopg2.Error as e:
         print(f"Database error in get_history: {e}")
         return jsonify({"error": "Failed to retrieve job history"}), 500
 
@@ -1459,7 +1462,7 @@ def log_action():
                 (description,)
             )
         return jsonify({"message": "Action logged successfully"}), 201
-    except psycopg.Error as e:
+    except psycopg2.Error as e:
         print(f"Database error logging action: {description} - {e}")
         return jsonify({
             "error": "Failed to log action due to database error"
@@ -1484,7 +1487,7 @@ def get_actions():
             for row in actions
         ]
         return jsonify(action_list)
-    except psycopg.Error as e:
+    except psycopg2.Error as e:
         print(f"Database error retrieving actions: {e}")
         return jsonify({
             "error": "Failed to retrieve actions due to database error"
