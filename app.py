@@ -26,7 +26,7 @@ app.config['broker_url'] = os.environ.get('CELERY_BROKER_URL', 'redis://localhos
 app.config['result_backend'] = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
 
 # Initialize Celery
-celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
+celery = Celery(app.name, broker=app.config['broker_url'])
 celery.conf.update(app.config)
 
 # SSL Config for Upstash Redis
