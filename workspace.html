@@ -4,12 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tag Genius - Workspace</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen p-8">
 
-    <!-- VJ LOOP BACKGROUND - MATCHES INDEX.HTML -->
+    <!-- VJ LOOP BACKGROUND -->
     <video muted loop playsinline id="vj-background" class="paused">
         <source src="vj_loop_4_BW.mp4_compressed.mp4" type="video/mp4">
         Your browser does not support the video tag.
@@ -17,11 +20,11 @@
 
     <!-- HEADER NAVIGATION -->
     <header class="w-full max-w-7xl mx-auto mb-6 rounded-xl">
-        <nav class="flex items-center justify-between p-4">
-            <h1 class="text-xl font-bold text-white">Workspace</h1>
-            <div class="flex items-center space-x-6">
-                <a href="index.html" class="text-sm font-medium text-white hover:text-blue-400 transition-colors">HOME</a>
-                <a href="history.html" class="text-sm font-medium text-white hover:text-blue-400 transition-colors">HISTORY</a>
+        <nav class="flex items-center justify-center p-4">
+            <div class="flex items-center space-x-12">
+                <a href="history.html" class="nav-link text-sm font-medium text-white hover:text-blue-400 transition-colors">HISTORY</a>
+                <a href="index.html" class="nav-link text-sm font-medium text-white hover:text-blue-400 transition-colors">TAG GENIUS</a>
+                <a href="workspace.html" class="nav-link nav-link-active text-sm font-medium text-white hover:text-blue-400 transition-colors">WORKSPACE</a>
             </div>
         </nav>
     </header>
