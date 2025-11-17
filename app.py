@@ -13,7 +13,6 @@ from flask_cors import CORS
 from celery import Celery
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from psycopg2.extras import RealDictCursor
 
 # --- SETUP ---
 
@@ -92,7 +91,7 @@ def get_db_connection():
     database_url = os.environ.get('DATABASE_URL')
     if not database_url:
         raise ValueError("DATABASE_URL environment variable not set")
-    conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
+    conn = psycopg.connect(database_url, row_factory=psycopg.rows.dict_row)
     return conn
 
 @contextmanager
@@ -103,7 +102,7 @@ def db_cursor():
     try:
         yield cursor
         conn.commit()
-    except psycopg2.Error as e:
+    except psycopg.Error as e:
         conn.rollback()
         print(f"Database transaction failed:{e}")
         raise e
@@ -174,7 +173,7 @@ def db_cursor():
 #                 );
 #             """)
 #         print('Database with all tables initialized successfully.')
-#     except psycopg2.Error as e:
+#     except psycopg.Error as e:
 #         print(f"Database initialisation failed: {e}")
 #
 #
@@ -190,7 +189,7 @@ def db_cursor():
 #             cursor.execute("DROP TABLE IF EXISTS processing_log")
 #             cursor.execute("DROP TABLE IF EXISTS user_actions")
 #             print("All application tables dropped successfully.")
-#     except psycopg2.Error as e:
+#     except psycopg.Error as e:
 #         print(f"Failed to drop tables: {e}")
 
 
@@ -206,7 +205,7 @@ def get_track_blueprint(name, artist):
 
             if result and result['tags_json']:
                 return json.loads(result['tags_json'])
-    except (psycopg2.Error, json.JSONDecodeError) as e:
+    except (psycopg.Error, json.JSONDecodeError) as e:
         print(f"Error retrieving blueprint for {artist} - {name}: {e}")
     return None
 
@@ -274,11 +273,12 @@ def insert_track_data(name, artist, bpm, tonality, genre, label, comments,
                     """INSERT INTO tracks
                        (name, artist, bpm, tonality, genre, label, comments,
                         grouping, tags_json)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
                     (name, artist, bpm, tonality, genre, label, comments,
                      grouping, tags_json_string)
                 )
-                track_id = cursor.lastrowid
+                result = cursor.fetchone()
+                track_id = result['id'] if result else None
                 print(f"Successfully inserted track ID: {track_id}")
 
             # Process and link tags
@@ -308,7 +308,7 @@ def insert_track_data(name, artist, bpm, tonality, genre, label, comments,
                         "INSERT INTO tags (name) VALUES (%s)",
                         (tag_name,)
                     )
-                    tag_id = cursor.lastrowid
+                    tag_id = cursor.fetchone()['id']
                 tag_ids.append(tag_id)
 
             if tag_ids:
@@ -322,7 +322,7 @@ def insert_track_data(name, artist, bpm, tonality, genre, label, comments,
 
             print(f"Database record updated for track ID {track_id}.")
 
-    except psycopg2.Error as e:
+    except psycopg.Error as e:
         print(f"Database error in insert_track_data for "
               f"{artist} - {name}: {e}")
 
@@ -338,8 +338,8 @@ def log_job_start(filename, input_path, job_type, job_display_name):
                 (filename, input_path, 'In Progress', job_type,
                  job_display_name)
             )
-            return cursor.lastrowid
-    except psycopg2.Error as e:
+            return cursor.fetchone()['id']
+    except psycopg.Error as e:
         print(f"Failed to create log entry for {filename}: {e}")
         return None
 
@@ -356,7 +356,7 @@ def log_job_end(log_id, status, track_count, output_path):
             )
             print(f"Finished logging for job ID: {log_id} "
                   f"with status: {status}")
-    except psycopg2.Error as e:
+    except psycopg.Error as e:
         print(f"Failed to update log entry for job ID {log_id}: {e}")
 
 
@@ -398,7 +398,7 @@ def cleanup_stale_jobs():
             else:
                 print(" No stale jobs to clean up\n")
 
-    except psycopg2.Error as e:
+    except psycopg.Error as e:
         print(f"  Failed to clean up stale jobs: {e}\n")
 
 
@@ -1371,7 +1371,7 @@ def download_job_package(job_id):
             download_name=(f'tag_genius_job_{job_id}_'
                            f'{original_filename}_archive.zip')
         )
-    except psycopg2.Error as e:
+    except psycopg.Error as e:
         print(f"Database error finding job {job_id}: {e}")
         return jsonify({
             "error": "Database error retrieving job details."
@@ -1419,7 +1419,7 @@ def export_xml():
                          "missing on server."
             }), 404
 
-    except psycopg2.Error as e:
+    except psycopg.Error as e:
         print(f"Database error during export lookup: {e}")
         return jsonify({
             "error": "Database error retrieving file path."
@@ -1437,7 +1437,7 @@ def get_history():
             logs = cursor.fetchall()
         history_list = [dict(row) for row in logs]
         return jsonify(history_list)
-    except psycopg2.Error as e:
+    except psycopg.Error as e:
         print(f"Database error in get_history: {e}")
         return jsonify({"error": "Failed to retrieve job history"}), 500
 
@@ -1462,7 +1462,7 @@ def log_action():
                 (description,)
             )
         return jsonify({"message": "Action logged successfully"}), 201
-    except psycopg2.Error as e:
+    except psycopg.Error as e:
         print(f"Database error logging action: {description} - {e}")
         return jsonify({
             "error": "Failed to log action due to database error"
@@ -1487,7 +1487,7 @@ def get_actions():
             for row in actions
         ]
         return jsonify(action_list)
-    except psycopg2.Error as e:
+    except psycopg.Error as e:
         print(f"Database error retrieving actions: {e}")
         return jsonify({
             "error": "Failed to retrieve actions due to database error"
