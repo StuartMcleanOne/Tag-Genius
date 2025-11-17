@@ -1,5 +1,5 @@
 import os
-import psycopg2
+import psycopg
 import xml.etree.ElementTree as ET
 import json
 import requests
