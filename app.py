@@ -815,8 +815,32 @@ def clear_ai_tags(track_element):
 @celery.task
 def split_library_task(log_id, input_path, job_folder_path):
     """Celery task to orchestrate library splitting in background."""
+
+    def is_job_cancelled():
+        """Check if job has been cancelled by user."""
+        try:
+            with db_cursor() as cursor:
+                cursor.execute(
+                    "SELECT status FROM processing_log WHERE id = %s",
+                    (log_id,)
+                )
+                result = cursor.fetchone()
+                return result and result['status'] == 'Cancelled'
+        except:
+            return False
+
     try:
+        # Check cancellation before starting
+        if is_job_cancelled():
+            print(f"Split job {log_id} was cancelled before starting.")
+            return {"error": "Job cancelled by user"}
+
         created_files = split_xml_by_genre(input_path, job_folder_path)
+
+        # Check cancellation after split
+        if is_job_cancelled():
+            print(f"Split job {log_id} was cancelled after processing.")
+            return {"error": "Job cancelled by user"}
 
         outputs_base_path = os.path.abspath("outputs")
         relative_paths = [
@@ -851,6 +875,19 @@ def process_library_task(log_id, input_path, output_path, config):
     if not log_id:
         return {"error": "Failed to initialize logging for the job."}
 
+    def is_job_cancelled():
+        """Check if job has been cancelled by user."""
+        try:
+            with db_cursor() as cursor:
+                cursor.execute(
+                    "SELECT status FROM processing_log WHERE id = %s",
+                    (log_id,)
+                )
+                result = cursor.fetchone()
+                return result and result['status'] == 'Cancelled'
+        except:
+            return False
+
     try:
         tree = ET.parse(input_path)
         root = tree.getroot()
@@ -863,6 +900,11 @@ def process_library_task(log_id, input_path, output_path, config):
 
         processed_count = 0
         for index, track in enumerate(tracks):
+            # CHECK FOR CANCELLATION EVERY TRACK
+            if is_job_cancelled():
+                print(f"Job {log_id} was cancelled by user. Stopping...")
+                return {"error": "Job cancelled by user"}
+
             track_name = track.get('Name')
             artist = track.get('Artist')
             print(f"\nProcessing track {index + 1}/{total_tracks}: "
@@ -1494,6 +1536,40 @@ def get_actions():
         return jsonify({
             "error": "Failed to retrieve actions due to database error"
         }), 500
+
+
+@app.route('/cancel_job/<int:job_id>', methods=['POST'])
+def cancel_job(job_id):
+    """Cancel a running Celery task and mark job as cancelled."""
+    try:
+        with db_cursor() as cursor:
+            # Get the Celery task ID if we stored it
+            cursor.execute(
+                "SELECT status FROM processing_log WHERE id = %s",
+                (job_id,)
+            )
+            result = cursor.fetchone()
+
+            if not result:
+                return jsonify({"error": f"Job {job_id} not found"}), 404
+
+            if result['status'] != 'In Progress':
+                return jsonify({"error": f"Job {job_id} is not in progress"}), 400
+
+            # Mark as cancelled in database
+            cursor.execute(
+                "UPDATE processing_log SET status = %s WHERE id = %s",
+                ('Cancelled', job_id)
+            )
+
+            # Note: The Celery task will complete but the result will be marked as cancelled
+            print(f"Job {job_id} marked as cancelled")
+            return jsonify({"message": f"Job {job_id} cancelled"}), 200
+
+    except psycopg.Error as e:
+        print(f"Database error cancelling job {job_id}: {e}")
+        return jsonify({"error": "Failed to cancel job"}), 500
+
 
 @app.route('/app')
 def serve_index():
