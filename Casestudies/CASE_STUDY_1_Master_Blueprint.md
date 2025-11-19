@@ -8,7 +8,7 @@
 **Application:** Tag Genius - AI-powered DJ library tagging system  
 **Role:** Solo Full-Stack Developer  
 **Timeline:** Week 4 of 6-week MVP development  
-**Tech Stack:** Python, Flask, Celery, PostgreSQL, OpenAI API
+**Tech Stack:** Python, Flask, Celery, SQLite, OpenAI API
 
 ---
 
@@ -21,14 +21,14 @@ After launching the MVP beta, user feedback revealed a critical UX issue:
 **User Behavior:**
 ```
 User: "Let me try 'Essential' tagging first..." 
-  → Uploads 250-track library
-  → Waits 40 minutes
-  → Gets tagged file
+  â†’ Uploads 250-track library
+  â†’ Waits 40 minutes
+  â†’ Gets tagged file
 
 User: "Hmm, I want more detail. Let me try 'Detailed'..."
-  → Re-uploads same library
-  → Waits ANOTHER 40 minutes
-  → Gets tagged file again
+  â†’ Re-uploads same library
+  â†’ Waits ANOTHER 40 minutes
+  â†’ Gets tagged file again
 
 User: "This is frustrating. I should be able to experiment!"
 ```
@@ -37,8 +37,8 @@ User: "This is frustrating. I should be able to experiment!"
 
 **Financial Impact:**
 ```
-Run 1 (Essential):  250 tracks × $0.002/track = $0.50
-Run 2 (Detailed):   250 tracks × $0.002/track = $0.50
+Run 1 (Essential):  250 tracks Ã— $0.002/track = $0.50
+Run 2 (Detailed):   250 tracks Ã— $0.002/track = $0.50
 Total Cost: $1.00 for what should be ONE processing job
 ```
 
@@ -80,21 +80,21 @@ The solution was to fundamentally rethink the data flow:
 **New Architecture:**
 ```
 PHASE 1: First Encounter (Cache Miss)
-  ↓
+  â†“
 Always call API with MAXIMUM detail
-  ↓
+  â†“
 Save complete response as "Master Blueprint"
-  ↓
+  â†“
 Render subset based on user's level
-  ↓
+  â†“
 Write to XML
 
 PHASE 2: Subsequent Runs (Cache Hit)
-  ↓
+  â†“
 Load Master Blueprint from database
-  ↓
+  â†“
 Render subset based on NEW level
-  ↓
+  â†“
 Write to XML (zero API calls!)
 ```
 
@@ -104,7 +104,7 @@ Write to XML (zero API calls!)
 
 ```sql
 CREATE TABLE tracks (
-    id SERIAL PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     artist TEXT,
     bpm REAL,
@@ -162,12 +162,12 @@ def process_track(track_name, artist, user_config):
     blueprint = get_track_blueprint(track_name, artist)
     
     if blueprint:
-        print(f"âœ… CACHE HIT: {track_name}")
+        print(f"Ã¢Å“â€¦ CACHE HIT: {track_name}")
         # Instant rendering from cached blueprint
         tags_for_xml = apply_user_config_to_tags(blueprint, user_config)
         processing_time = 0.02  # Milliseconds
     else:
-        print(f"âš ï¸ CACHE MISS: {track_name}")
+        print(f"Ã¢Å¡ Ã¯Â¸ CACHE MISS: {track_name}")
         # Call API with MAXIMUM detail config
         track_data = {
             'ARTIST': artist,
@@ -297,19 +297,19 @@ def apply_user_config_to_tags(blueprint_tags, user_config):
 **Before:**
 ```
 User wants to experiment with detail levels
-  → Must re-upload and re-process entire library
-  → 40 minutes per experiment
-  → $0.50 per experiment
-  → Result: Users don't experiment (poor UX)
+  â†’ Must re-upload and re-process entire library
+  â†’ 40 minutes per experiment
+  â†’ $0.50 per experiment
+  â†’ Result: Users don't experiment (poor UX)
 ```
 
 **After:**
 ```
 User wants to experiment with detail levels
-  → Changes dropdown, clicks "Re-tag"
-  → Instant result (0.02 seconds)
-  → Zero cost
-  → Result: Users freely experiment (excellent UX)
+  â†’ Changes dropdown, clicks "Re-tag"
+  â†’ Instant result (0.02 seconds)
+  â†’ Zero cost
+  â†’ Result: Users freely experiment (excellent UX)
 ```
 
 ### Cost Savings (Projected Annual)
@@ -321,13 +321,13 @@ User wants to experiment with detail levels
 
 **Costs Without Cache:**
 ```
-100 users × 3 runs × 250 tracks × $0.002 = $150/month
+100 users Ã— 3 runs Ã— 250 tracks Ã— $0.002 = $150/month
 Annual: $1,800
 ```
 
 **Costs With Cache:**
 ```
-100 users × 1 run × 250 tracks × $0.002 = $50/month
+100 users Ã— 1 run Ã— 250 tracks Ã— $0.002 = $50/month
 Annual: $600
 
 Savings: $1,200/year (67% reduction)
@@ -422,10 +422,10 @@ CREATE TABLE track_tags (
 - **Atomicity:** All tags updated together
 
 **Trade-offs:**
-- ✅ Pro: Faster for our use case
-- ✅ Pro: Easier to implement
-- ❌ Con: Can't query "all tracks with tag X"
-- ❌ Con: Larger storage footprint
+- âœ… Pro: Faster for our use case
+- âœ… Pro: Easier to implement
+- âŒ Con: Can't query "all tracks with tag X"
+- âŒ Con: Larger storage footprint
 
 **When Normalized Would Win:**
 - Need to search by specific tags
@@ -450,9 +450,9 @@ def process_track(track, user_config):
 - Future-proof for new features
 
 **Trade-offs:**
-- ✅ Pro: Enables instant experimentation
-- ✅ Pro: Foundation for V2.0 community cache
-- ❌ Con: Slightly higher initial API cost (negligible)
+- âœ… Pro: Enables instant experimentation
+- âœ… Pro: Foundation for V2.0 community cache
+- âŒ Con: Slightly higher initial API cost (negligible)
 
 ---
 
@@ -478,8 +478,8 @@ def process_track(track, user_config):
 > "Don't make things faster. Make them unnecessary."
 
 **Application:**
-- Re-tagging: 40 min → 0.02 sec (not 10% faster, 99.9% faster)
-- API calls: $0.50 → $0.00 (not reduced, eliminated)
+- Re-tagging: 40 min â†’ 0.02 sec (not 10% faster, 99.9% faster)
+- API calls: $0.50 â†’ $0.00 (not reduced, eliminated)
 
 **Principle:**
 - Look for repeated work that yields same result
@@ -508,14 +508,14 @@ Best solutions come from understanding user intent, not just requirements.
 **Architecture:**
 ```
 User A tags "Daft Punk - One More Time"
-  → Generates Master Blueprint
-  → Saves to GLOBAL database
-  → Anonymous contribution
+  â†’ Generates Master Blueprint
+  â†’ Saves to GLOBAL database
+  â†’ Anonymous contribution
 
 User B tags same track (days later)
-  → Instant cache hit from community
-  → Zero API cost
-  → Zero wait time
+  â†’ Instant cache hit from community
+  â†’ Zero API cost
+  â†’ Zero wait time
 
 Result: Network effects + near-zero marginal cost
 ```
@@ -541,7 +541,7 @@ Result: Network effects + near-zero marginal cost
 - **Code Changes:** ~200 lines added
 - **Performance Gain:** 120,000x faster (cache hits)
 - **Cost Reduction:** 67% annual savings
-- **User Satisfaction:** "Experiment freely" → key feature
+- **User Satisfaction:** "Experiment freely" â†’ key feature
 
 ### The Core Innovation
 
@@ -562,7 +562,7 @@ This architectural pattern applies beyond this project:
 
 **After:** Learned optimization means "identify repeated work and eliminate it"
 
-The best performance improvements don't make code run faster—they make code run less often.
+The best performance improvements don't make code run fasterâ€”they make code run less often.
 
 ---
 

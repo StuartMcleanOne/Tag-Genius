@@ -45,7 +45,7 @@ Redis (Message Broker)
   ↓
 Celery Worker (Background Processing)
   ↓
-PostgreSQL (Data Persistence)
+SQLite (Data Persistence)
 ```
 
 **Rationale:**
@@ -279,7 +279,7 @@ Second Tagging (Cache Hit):
 **Database Schema:**
 ```sql
 CREATE TABLE tracks (
-    id SERIAL PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     artist TEXT,
     bpm REAL,
@@ -337,29 +337,56 @@ def process_track(track, user_config):
 
 ---
 
-### PostgreSQL Over MongoDB
+### SQLite for MVP
 
-**Decision:** Use relational database (PostgreSQL)
+**Decision:** Use SQLite for local development and MVP deployment
 
 **Alternatives Considered:**
-- SQLite (initial implementation, outgrew it)
-- MongoDB (considered for tags_json flexibility)
+- PostgreSQL (cloud-ready but requires external server)
+- MongoDB (flexible schema but overkill)
+- MySQL (heavyweight for single-user app)
 
-**Why PostgreSQL:**
-- **ACID:** Job logging requires transactional integrity
-- **Indexing:** Fast lookups by (name, artist) for cache hits
-- **JSON Support:** `jsonb` type handles Master Blueprints
-- **Cloud-Native:** Supabase provides managed PostgreSQL
-- **SQL:** Easier analytics queries (job success rates, etc.)
+**Why SQLite:**
+- **Zero Config:** Single file, no server required
+- **ACID:** Full transaction support
+- **Python Native:** Built into Python standard library
+- **Sufficient:** Handles 100,000+ tracks easily
+- **Simple Deployment:** One file to backup/restore
+
+**Technical Details:**
+```python
+def get_db_connection():
+    """Establishes and returns a connection to the SQLite database."""
+    conn = sqlite3.connect('tag_genius.db')
+    conn.row_factory = sqlite3.Row  # Dict-like access
+    return conn
+```
+
+**Limitations:**
+- **Concurrency:** Single writer (fine for MVP)
+- **Network:** No remote access (fine for local app)
+- **Scale:** Not ideal for 1M+ tracks or multi-user
+
+**When to Migrate:**
+- V2.0 community cache (needs shared database)
+- Multi-user deployment
+- Need for advanced querying features
+
+**Migration Path to PostgreSQL:**
+```python
+# Future V2.0:
+# 1. Replace sqlite3 with psycopg
+# 2. Update SQL syntax (AUTOINCREMENT → SERIAL)
+# 3. Add RETURNING clauses for inserts
+# 4. Deploy to Supabase/Render
+```
 
 **Trade-offs:**
-- **Pro:** Battle-tested, mature ecosystem
-- **Pro:** Free tier on Supabase (generous limits)
-- **Con:** Schema migrations more complex than NoSQL
-
-**MongoDB Would Win If:**
-- Schema changes frequently (not the case)
-- No relational queries needed (we need job history joins)
+- **Pro:** Dead simple, zero external dependencies
+- **Pro:** Fast for single-user workload
+- **Pro:** Portable (entire DB is one file)
+- **Con:** Can't scale to community cache without migration
+- **Con:** No built-in replication
 
 ---
 
@@ -629,97 +656,47 @@ SELECT tags_json FROM tracks WHERE name = 'Track' AND artist = 'Artist';
 
 ## Deployment Decisions
 
-### Render.com for Hosting
+### Local Development Simplicity
 
-**Decision:** Deploy to Render.com PaaS
+**Decision:** Keep deployment simple for MVP
 
-**Alternatives Considered:**
-- Heroku (more expensive)
-- AWS EC2 (more complex)
-- DigitalOcean (manual setup)
-- Vercel (doesn't support Celery workers)
-
-**Why Render:**
-- **Free Tier:** Generous for MVP
-- **Background Workers:** Native Celery support
-- **PostgreSQL:** Free managed database
-- **Simplicity:** Git push to deploy
-- **Pricing:** Transparent, scales gradually
-
-**Architecture on Render:**
-```
-Service 1: Web Service (Flask)
-  - Type: Web Service
-  - Command: gunicorn app:app
-
-Service 2: Background Worker (Celery)
-  - Type: Background Worker
-  - Command: celery -A app:celery worker
-
-Service 3: Redis (Upstash)
-  - Type: External
-  - Free tier via Upstash
-
-Service 4: PostgreSQL (Supabase)
-  - Type: External
-  - Free tier via Supabase
-```
-
-**Trade-offs:**
-- **Pro:** Extremely simple deployment
-- **Pro:** Free tier perfect for MVP
-- **Con:** Limited control vs EC2
-- **Con:** Cold starts on free tier
-
----
-
-### Gunicorn for Production Server
-
-**Decision:** Use Gunicorn instead of Flask dev server
-
+**Current Setup:**
 ```bash
-# Don't do this in production
-python app.py
+# Terminal 1: Redis
+docker run -d --name tag-genius-redis -p 6379:6379 redis:latest
 
-# Do this
-gunicorn app:app --workers 4 --timeout 120
+# Terminal 2: Flask
+python3 app.py
+
+# Terminal 3: Celery
+celery -A app:celery worker --loglevel=info
 ```
 
-**Why Gunicorn:**
-- **Production-Ready:** Handles concurrent requests
-- **Workers:** Multiple processes for parallelism
-- **Stability:** Automatic worker restart on crashes
-- **Standard:** Industry best practice
+**Why This Works:**
+- **No External Services:** Everything runs locally
+- **Easy Testing:** Fast iteration cycles
+- **Zero Cost:** No cloud bills during development
+- **Full Control:** Debug everything
 
-**Configuration:**
-```python
-# In Render.com
-Start Command: gunicorn app:app --workers 2 --timeout 120
+**Limitations:**
+- **Single Machine:** Can't distribute workload
+- **No Persistence:** Redis data lost on restart (acceptable for MVP)
+- **Manual Setup:** Each developer must configure
 
-# --workers 2: Two worker processes
-# --timeout 120: 2-minute timeout (for file uploads)
+**Future Production Architecture (V2.0):**
 ```
-
----
-
-### Python Version Lock
-
-**Decision:** Pin to Python 3.12.7
-
+Service 1: Web Service (Gunicorn)
+  - Deployed on Render.com
+  
+Service 2: Celery Workers
+  - Background service on Render.com
+  
+Service 3: Redis
+  - Upstash (managed Redis)
+  
+Service 4: PostgreSQL
+  - Supabase (managed database)
 ```
-# runtime.txt
-python-3.12.7
-```
-
-**Why Pin Version:**
-- **Compatibility:** psycopg3 requires 3.11+
-- **Avoid Python 3.13:** psycopg2 incompatibility
-- **Reproducibility:** Same version locally + production
-
-**Critical:**
-- Python 3.13 broke psycopg2-binary
-- Render.com defaults to latest (3.13 as of Nov 2024)
-- `runtime.txt` forces correct version
 
 ---
 
@@ -729,7 +706,6 @@ python-3.12.7
 
 ```python
 # .env file (local development)
-DATABASE_URL=postgresql://localhost/taggenius
 OPENAI_API_KEY=sk-...
 CELERY_BROKER_URL=redis://localhost:6379/0
 
@@ -738,15 +714,10 @@ import os
 api_key = os.environ.get("OPENAI_API_KEY")
 ```
 
-**In Production:**
-- Render.com dashboard → Environment Variables
-- Never commit `.env` to git
-- `.gitignore` includes `.env`
-
 **Security:**
 - No secrets in code or version control
 - Separate secrets per environment (dev/staging/prod)
-- Easy rotation (change in dashboard, restart service)
+- Easy rotation (change in .env, restart service)
 
 ---
 
@@ -776,13 +747,9 @@ When making architectural decisions, prioritize in this order:
 
 ## When to Revisit These Decisions
 
-### Celery → Serverless
-**Trigger:** If processing volume drops consistently
-**Alternative:** AWS Lambda for sporadic workloads
-
-### PostgreSQL → DynamoDB
-**Trigger:** If need extreme scale (millions of tracks)
-**Alternative:** NoSQL for flexible schema at scale
+### SQLite → PostgreSQL
+**Trigger:** V2.0 community cache feature
+**Alternative:** Cloud database for shared access
 
 ### Polling → WebSockets
 **Trigger:** If real-time updates become critical
@@ -811,10 +778,10 @@ Celery Worker
     ↓ [2. For each track:]
         ↓ [Check cache]
         ↓ [Call OpenAI if needed]
-        ↓ [Save to PostgreSQL]
+        ↓ [Save to SQLite]
     ↓ [3. Write XML]
     ↓ [4. Update job status]
-PostgreSQL
+SQLite Database
     ↓ [Job marked 'Completed']
 User Browser (polling)
     ↓ [GET /history every 5 sec]

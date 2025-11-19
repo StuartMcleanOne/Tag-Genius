@@ -57,7 +57,7 @@ More importantly: it's **consistent**. French House is French House, every time.
 ## Key Features
 
 ### 🎯 The Master Blueprint System
-Tag Genius creates a "Master Blueprint" for every track on first encounter - a complete profile stored in the database. Future tagging jobs simply retrieve and render this cached data at whatever detail level you choose (Essential, Recommended, Detailed). Result: **instant re-tagging** without additional AI costs.
+Tag Genius creates a "Master Blueprint" for every track on first encounter - a complete profile stored locally in the database. Future tagging jobs simply retrieve and render this cached data at whatever detail level you choose (Essential, Recommended, Detailed). Result: **instant re-tagging** without additional AI costs.
 
 ### ⚡ Asynchronous Processing
 Built on Flask + Celery + Redis, large library jobs run in the background without freezing your browser. Real-time status updates via JavaScript polling keep you informed.
@@ -84,7 +84,7 @@ Every job is logged with timestamps. Download archived "before" and "after" XML 
 ## Tech Stack
 
 * **Backend:** Python, Flask
-* **Database:** PostgreSQL (Supabase)
+* **Database:** SQLite (local file storage)
 * **Task Queue:** Celery
 * **Message Broker:** Redis (Docker)
 * **AI Engine:** OpenAI GPT-4o-mini
@@ -98,7 +98,6 @@ Every job is logged with timestamps. Download archived "before" and "after" XML 
 - Python 3.12+
 - Docker Desktop (for Redis)
 - OpenAI API key
-- Supabase account (or local PostgreSQL)
 
 ### Installation Steps
 
@@ -123,17 +122,14 @@ Every job is logged with timestamps. Download archived "before" and "after" XML 
    
    Create a `.env` file in the root directory:
    ```env
-   DATABASE_URL=your_supabase_postgresql_connection_string
    OPENAI_API_KEY=your_openai_api_key
    CELERY_BROKER_URL=redis://localhost:6379/0
    CELERY_RESULT_BACKEND=redis://localhost:6379/0
    ```
 
 5. **Initialize the database**
-   
-   The database schema is created automatically on first run, or use:
    ```bash
-   python3 -c "from app import init_db; init_db()"
+   flask init-db
    ```
 
 ---
@@ -209,6 +205,11 @@ This provides structure without sacrificing nuance. The AI has the freedom to id
 Evolve from a single-user tool to a **global knowledge base**. When you tag a track, the result is anonymously contributed to a community database. Future users get **instant results** for popular tracks without API calls.
 
 **Network effects:** The more users, the larger the cache, the faster everyone's experience.
+
+**Technical Requirements:**
+- Migration from SQLite to cloud database (PostgreSQL/Supabase)
+- De-duplication system for track matching
+- Privacy-preserving anonymous contribution system
 
 ### Genre-Specific Calibration Profiles
 Let users choose specialized AI profiles (e.g., "Techno Genius", "Deep House Specialist") that calibrate energy ratings and tag vocabulary for specific genres.

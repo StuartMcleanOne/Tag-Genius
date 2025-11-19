@@ -8,7 +8,7 @@
 **Application:** Tag Genius - AI-powered DJ library tagging system  
 **Role:** Solo Full-Stack Developer  
 **Timeline:** Week 2-3 of 6-week MVP development  
-**Tech Stack:** Python, Flask, Celery, Redis, PostgreSQL
+**Tech Stack:** Python, Flask, Celery, Redis, SQLite
 
 ---
 
@@ -23,17 +23,17 @@ After successfully implementing the core tagging logic, the application was test
 **Result:**
 ```
 User uploads file
-  → Flask starts processing
-  → Progress shown: "Processing track 47/500..."
-  → 3 minutes pass
-  → Browser shows: "ERR_CONNECTION_TIMED_OUT"
-  → Process killed, user loses all work
-  → No file generated
+  â†’ Flask starts processing
+  â†’ Progress shown: "Processing track 47/500..."
+  â†’ 3 minutes pass
+  â†’ Browser shows: "ERR_CONNECTION_TIMED_OUT"
+  â†’ Process killed, user loses all work
+  â†’ No file generated
 ```
 
 **Diagnosis:**
 - Browser timeout: 2-3 minutes (hard limit)
-- Estimated processing time: 40+ minutes (500 tracks × ~5 sec/track)
+- Estimated processing time: 40+ minutes (500 tracks Ã— ~5 sec/track)
 - Architecture: **Synchronous** (main Flask thread blocking)
 
 ### Root Cause: Synchronous Architecture
@@ -65,8 +65,8 @@ def upload_library():
 
 **The Flow:**
 ```
-User Request → Flask Thread → Process 500 tracks → Return Response
-                     ↑                                      ↑
+User Request â†’ Flask Thread â†’ Process 500 tracks â†’ Return Response
+                     â†‘                                      â†‘
                  Blocks here                          Never reaches
                    for 40 min                        (timeout at 3 min)
 ```
@@ -101,8 +101,8 @@ User Request → Flask Thread → Process 500 tracks → Return Response
 
 **New Design:**
 ```
-User Request (instant) → Flask → Job Queue → Background Worker (slow)
-                           ↓
+User Request (instant) â†’ Flask â†’ Job Queue â†’ Background Worker (slow)
+                           â†“
                     Return job_id
                     (202 Accepted)
 ```
@@ -118,13 +118,13 @@ Separate **job creation** (fast) from **job execution** (slow)
 |-----------|--------|------------------------|
 | **Task Queue** | Celery | RQ, Dramatiq, AWS SQS |
 | **Message Broker** | Redis | RabbitMQ, Amazon SQS |
-| **Database** | PostgreSQL | MongoDB, SQLite |
+| **Database** | SQLite | PostgreSQL, MongoDB |
 | **Web Framework** | Flask | FastAPI, Django |
 
 **Why This Stack:**
 - **Celery:** Industry standard, mature, well-documented
 - **Redis:** In-memory speed, simple setup, reliable
-- **PostgreSQL:** ACID compliance for job logging
+- **SQLite:** Simple, ACID-compliant, perfect for MVP
 - **Flask:** Already using, sufficient for needs
 
 ---
@@ -135,7 +135,7 @@ Separate **job creation** (fast) from **job execution** (slow)
 
 **Install Dependencies:**
 ```bash
-pip install celery redis psycopg2-binary
+pip install celery redis
 ```
 
 **Start Redis:**
@@ -215,11 +215,11 @@ def process_library_task(log_id, input_path, output_path, config):
 ```
 
 **Key Changes:**
-1. `@celery.task` decorator → runs in background
-2. Added `log_id` parameter → track job status
-3. Added cancellation check → allow user to stop
-4. Added error handling → graceful failures
-5. Returns status dict → job result tracking
+1. `@celery.task` decorator â†’ runs in background
+2. Added `log_id` parameter â†’ track job status
+3. Added cancellation check â†’ allow user to stop
+4. Added error handling â†’ graceful failures
+5. Returns status dict â†’ job result tracking
 
 ### Step 3: Update Flask Route
 
@@ -278,7 +278,7 @@ def upload_library():
 **Schema:**
 ```sql
 CREATE TABLE processing_log (
-    id SERIAL PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     job_display_name TEXT,
     original_filename TEXT NOT NULL,
@@ -411,28 +411,28 @@ celery -A app:celery worker --loglevel=info
 **Before (Synchronous):**
 ```
 User: Upload 500-track library
-  ↓
+  â†“
 App: [Shows spinning wheel]
-  ↓
+  â†“
 User: Waits 3 minutes
-  ↓
+  â†“
 Browser: "Connection timed out"
-  ↓
+  â†“
 User: "This doesn't work."
 ```
 
 **After (Asynchronous):**
 ```
 User: Upload 500-track library
-  ↓
+  â†“
 App: "Job started! Processing in background..."
-  ↓
+  â†“
 User: Sees real-time status updates
-  ↓ (can close tab, come back later)
+  â†“ (can close tab, come back later)
 User: Notification "Job complete!"
-  ↓
+  â†“
 User: Click download button
-  ↓
+  â†“
 User: "This is amazing!"
 ```
 
@@ -440,18 +440,18 @@ User: "This is amazing!"
 
 **Before:**
 ```
-1 user uploading → Server busy
-2nd user tries → Waits for 1st user (40 min)
-3rd user tries → Waits for 1st + 2nd (80 min)
+1 user uploading â†’ Server busy
+2nd user tries â†’ Waits for 1st user (40 min)
+3rd user tries â†’ Waits for 1st + 2nd (80 min)
 
 Result: Linear bottleneck, unusable at scale
 ```
 
 **After:**
 ```
-10 users uploading → All accepted instantly
-Celery worker → Processes jobs in queue order
-Add more workers → Parallel processing
+10 users uploading â†’ All accepted instantly
+Celery worker â†’ Processes jobs in queue order
+Add more workers â†’ Parallel processing
 
 Result: Horizontal scaling, production-ready
 ```
@@ -523,27 +523,21 @@ def cancel_job(job_id):
 
 **Result:** Worker checks database every track, gracefully stops when cancelled.
 
-### Challenge 2: Database Connection Pooling
+### Challenge 2: Database Connection Management
 
-**Problem:** Each worker needs database connections.
+**Context:** SQLite uses file-based connections, not connection pools like server databases.
 
-**Initial Error:**
-```
-psycopg2.OperationalError: FATAL: remaining connection slots 
-are reserved for non-replication superuser connections
-```
+**Approach:** Simple context manager pattern
 
-**Cause:** Opening connection per task, hitting PostgreSQL's connection limit.
-
-**Solution:**
+**Implementation:**
 ```python
-# Don't create connection pool in worker
-# Each task creates/closes its own connection
+# Each task creates/closes its own SQLite connection
 
 @contextmanager
 def db_cursor():
     """Context manager ensures connection cleanup"""
-    conn = psycopg.connect(DATABASE_URL)
+    conn = sqlite3.connect('tag_genius.db')
+    conn.row_factory = sqlite3.Row  # Dict-like access
     cursor = conn.cursor()
     try:
         yield cursor
@@ -563,7 +557,13 @@ def process_library_task(log_id, ...):
         cursor.execute("UPDATE ...")
 ```
 
-**Result:** No connection leaks, stays within PostgreSQL limits.
+**Why This Works for SQLite:**
+- **No Connection Limits:** SQLite doesn't have server connection limits
+- **File-Based:** Single file, no network overhead
+- **Thread-Safe:** SQLite handles concurrent reads automatically
+- **Simple:** No connection pooling complexity needed
+
+**Result:** Clean, simple, reliable database access.
 
 ### Challenge 3: File Storage Management
 
@@ -573,18 +573,18 @@ def process_library_task(log_id, ...):
 
 ```
 uploads/
-  ├── library_20241118-153000.xml
-  ├── library_20241118-153200.xml
-  └── ...
+  â”œâ”€â”€ library_20241118-153000.xml
+  â”œâ”€â”€ library_20241118-153200.xml
+  â””â”€â”€ ...
 
 outputs/
-  ├── tagged_library_20241118-153500.xml
-  ├── tagged_library_20241118-153700.xml
-  ├── split_job_20241118-154000/
-  │   ├── Electronic.xml
-  │   ├── Hip_Hop.xml
-  │   └── Rock.xml
-  └── ...
+  â”œâ”€â”€ tagged_library_20241118-153500.xml
+  â”œâ”€â”€ tagged_library_20241118-153700.xml
+  â”œâ”€â”€ split_job_20241118-154000/
+  â”‚   â”œâ”€â”€ Electronic.xml
+  â”‚   â”œâ”€â”€ Hip_Hop.xml
+  â”‚   â””â”€â”€ Rock.xml
+  â””â”€â”€ ...
 ```
 
 **Alternative Considered:** AWS S3
@@ -607,100 +607,100 @@ outputs/
 ### Data Flow (Complete Request Lifecycle)
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ USER BROWSER                                                │
-└────────────┬────────────────────────────────────────────────┘
-             │
-             │ POST /upload_library
-             │ (file + config)
-             ↓
-┌─────────────────────────────────────────────────────────────┐
-│ FLASK WEB SERVER (Port 5001)                               │
-│                                                             │
-│  1. Save file to disk                                       │
-│  2. Create job log (status: 'In Progress')                  │
-│  3. Dispatch task to Redis                                  │
-│  4. Return { job_id: 123 } (202 Accepted)                   │
-│                                                             │
-│  Response time: <100ms                                      │
-└────────────┬────────────────────────────────────────────────┘
-             │
-             │ Task queued
-             ↓
-┌─────────────────────────────────────────────────────────────┐
-│ REDIS MESSAGE BROKER (Port 6379)                           │
-│                                                             │
-│  Queue: [task_1, task_2, task_3, ...]                       │
-│                                                             │
-└────────────┬────────────────────────────────────────────────┘
-             │
-             │ Worker pulls task
-             ↓
-┌─────────────────────────────────────────────────────────────┐
-│ CELERY WORKER (Background Process)                         │
-│                                                             │
-│  For each track (500 tracks):                               │
-│    1. Check if cancelled → Stop if yes                      │
-│    2. Load Master Blueprint from cache                      │
-│    3. If cache miss → Call OpenAI API                       │
-│    4. Apply tags to XML                                     │
-│    5. Save blueprint to database                            │
-│                                                             │
-│  Processing time: ~40 minutes                               │
-│                                                             │
-│  Final:                                                     │
-│    - Write output XML                                       │
-│    - Update job status to 'Completed'                       │
-│                                                             │
-└────────────┬────────────────────────────────────────────────┘
-             │
-             │ Status updates
-             ↓
-┌─────────────────────────────────────────────────────────────┐
-│ POSTGRESQL DATABASE (Supabase)                             │
-│                                                             │
-│  processing_log table:                                      │
-│  ┌──────┬──────────────────┬───────────┬─────────────┐     │
-│  │ id   │ job_display_name │ status    │ output_path │     │
-│  ├──────┼──────────────────┼───────────┼─────────────┤     │
-│  │ 123  │ Library - Tag... │ Completed │ outputs/... │     │
-│  └──────┴──────────────────┴───────────┴─────────────┘     │
-│                                                             │
-└────────────┬────────────────────────────────────────────────┘
-             │
-             │ Poll every 5 seconds
-             ↓
-┌─────────────────────────────────────────────────────────────┐
-│ USER BROWSER (JavaScript)                                   │
-│                                                             │
-│  pollJobStatus(123):                                        │
-│    GET /history                                             │
-│    ↓                                                        │
-│    Check job 123 status                                     │
-│    ↓                                                        │
-│    if 'Completed' → Show download button                    │
-│    if 'In Progress' → Show "Processing..."                  │
-│    if 'Failed' → Show error                                 │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚ USER BROWSER                                                â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+             â”‚
+             â”‚ POST /upload_library
+             â”‚ (file + config)
+             â†“
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚ FLASK WEB SERVER (Port 5001)                               â”‚
+â”‚                                                             â”‚
+â”‚  1. Save file to disk                                       â”‚
+â”‚  2. Create job log (status: 'In Progress')                  â”‚
+â”‚  3. Dispatch task to Redis                                  â”‚
+â”‚  4. Return { job_id: 123 } (202 Accepted)                   â”‚
+â”‚                                                             â”‚
+â”‚  Response time: <100ms                                      â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+             â”‚
+             â”‚ Task queued
+             â†“
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚ REDIS MESSAGE BROKER (Port 6379)                           â”‚
+â”‚                                                             â”‚
+â”‚  Queue: [task_1, task_2, task_3, ...]                       â”‚
+â”‚                                                             â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+             â”‚
+             â”‚ Worker pulls task
+             â†“
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚ CELERY WORKER (Background Process)                         â”‚
+â”‚                                                             â”‚
+â”‚  For each track (500 tracks):                               â”‚
+â”‚    1. Check if cancelled â†’ Stop if yes                      â”‚
+â”‚    2. Load Master Blueprint from cache                      â”‚
+â”‚    3. If cache miss â†’ Call OpenAI API                       â”‚
+â”‚    4. Apply tags to XML                                     â”‚
+â”‚    5. Save blueprint to database                            â”‚
+â”‚                                                             â”‚
+â”‚  Processing time: ~40 minutes                               â”‚
+â”‚                                                             â”‚
+â”‚  Final:                                                     â”‚
+â”‚    - Write output XML                                       â”‚
+â”‚    - Update job status to 'Completed'                       â”‚
+â”‚                                                             â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+             â”‚
+             â”‚ Status updates
+             â†“
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+│ SQLITE DATABASE (Local File: tag_genius.db)                │
+â”‚                                                             â”‚
+â”‚  processing_log table:                                      â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”     â”‚
+â”‚  â”‚ id   â”‚ job_display_name â”‚ status    â”‚ output_path â”‚     â”‚
+â”‚  â”œâ”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤     â”‚
+â”‚  â”‚ 123  â”‚ Library - Tag... â”‚ Completed â”‚ outputs/... â”‚     â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜     â”‚
+â”‚                                                             â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+             â”‚
+             â”‚ Poll every 5 seconds
+             â†“
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚ USER BROWSER (JavaScript)                                   â”‚
+â”‚                                                             â”‚
+â”‚  pollJobStatus(123):                                        â”‚
+â”‚    GET /history                                             â”‚
+â”‚    â†“                                                        â”‚
+â”‚    Check job 123 status                                     â”‚
+â”‚    â†“                                                        â”‚
+â”‚    if 'Completed' â†’ Show download button                    â”‚
+â”‚    if 'In Progress' â†’ Show "Processing..."                  â”‚
+â”‚    if 'Failed' â†’ Show error                                 â”‚
+â”‚                                                             â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ### Comparison: Sync vs Async Architecture
 
 **Synchronous (Before):**
 ```
-Request → [Flask blocks] → [Process 40 min] → Response (timeout!)
-           ↑─────────── Single Thread ─────────↑
+Request â†’ [Flask blocks] â†’ [Process 40 min] â†’ Response (timeout!)
+           â†‘â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Single Thread â”€â”€â”€â”€â”€â”€â”€â”€â”€â†‘
 ```
 
 **Asynchronous (After):**
 ```
-Request → [Flask] → Response (instant)
-             ↓
+Request â†’ [Flask] â†’ Response (instant)
+             â†“
           [Redis Queue]
-             ↓
-          [Celery Worker] → [Process 40 min] → Update DB
-           ↑
+             â†“
+          [Celery Worker] â†’ [Process 40 min] â†’ Update DB
+           â†‘
       Separate Process
 ```
 
@@ -722,36 +722,44 @@ flask run
 celery -A app:celery worker --loglevel=info
 ```
 
-### Production (Render.com)
+### Production (Future - Currently Local MVP)
 
-**Service Architecture:**
+**Current MVP Deployment:**
 ```
-Service 1: Web Service
+Local Development:
+  - Flask: python3 app.py (localhost:5001)
+  - Celery: celery -A app:celery worker
+  - Redis: Docker container (localhost:6379)
+  - SQLite: Local file (tag_genius.db)
+```
+
+**Future Production Architecture (V2.0 - Not Yet Implemented):**
+```
+Service 1: Web Service (Render.com)
   - Type: Web Service
   - Build: pip install -r requirements.txt
   - Start: gunicorn app:app --workers 2 --timeout 120
   - Port: 5000 (auto-assigned)
 
-Service 2: Background Worker
+Service 2: Background Worker (Render.com)
   - Type: Background Worker
   - Build: pip install -r requirements.txt
   - Start: celery -A app:celery worker --loglevel=info
   - No port (background process)
 
-External Services:
-  - Redis: Upstash (free tier)
-  - PostgreSQL: Supabase (free tier)
+External Services (Future):
+  - Redis: Upstash (managed Redis)
+  - Database: PostgreSQL/Supabase (for community cache)
 ```
 
-**Environment Variables (Both Services):**
+**Environment Variables (Current MVP):**
 ```
-DATABASE_URL=postgresql://user:pass@host:5432/db
 OPENAI_API_KEY=sk-...
-CELERY_BROKER_URL=rediss://upstash-url:6379
-CELERY_RESULT_BACKEND=rediss://upstash-url:6379
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
 ```
 
-**Critical:** Both Flask and Celery need same environment variables.
+**Note:** SQLite database file (`tag_genius.db`) is stored locally and managed by the application.
 
 ---
 
@@ -760,21 +768,21 @@ CELERY_RESULT_BACKEND=rediss://upstash-url:6379
 ### 1. Async is Not Optional for Long Tasks
 
 **Rule of Thumb:**
-- Task completes in < 30 seconds? → Synchronous OK
-- Task completes in > 30 seconds? → Async required
-- Task has external API calls? → Async recommended
+- Task completes in < 30 seconds? â†’ Synchronous OK
+- Task completes in > 30 seconds? â†’ Async required
+- Task has external API calls? â†’ Async recommended
 
 **This Project:**
-- 500 tracks × 5 sec/track = 2,500 seconds (42 minutes)
+- 500 tracks Ã— 5 sec/track = 2,500 seconds (42 minutes)
 - **Must** be async, no question
 
 ### 2. Job Status is Critical UX
 
 **Users Need to Know:**
-- ✅ Did the job start?
-- ✅ Is it still running?
-- ✅ When will it finish?
-- ✅ Did it succeed or fail?
+- âœ… Did the job start?
+- âœ… Is it still running?
+- âœ… When will it finish?
+- âœ… Did it succeed or fail?
 
 **Implementation:**
 - Database-backed status (`processing_log` table)
@@ -859,12 +867,12 @@ generate_test_xml(500)
 
 **Current:**
 ```
-1 Celery worker → Processes jobs sequentially
+1 Celery worker â†’ Processes jobs sequentially
 ```
 
 **Future:**
 ```
-3 Celery workers → Process 3 jobs in parallel
+3 Celery workers â†’ Process 3 jobs in parallel
 
 # On Render.com
 worker-service-1: celery -A app:celery worker
@@ -955,7 +963,7 @@ def process_library_task(self, log_id, ...):
 
 > "Don't make users wait for long operations. Return immediately, process in background, notify when done."
 
-This is not just a technical pattern—it's a **fundamental UX principle** for modern web applications.
+This is not just a technical patternâ€”it's a **fundamental UX principle** for modern web applications.
 
 **Applications Beyond This Project:**
 - Email sending

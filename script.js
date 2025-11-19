@@ -47,6 +47,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainResultsTitle = document.getElementById('main-results-title');
     const mainTagResultContainer = document.getElementById('main-tag-result-container');
 
+    // Progress elements
+    const statusContainer = document.getElementById('status-container');
+    const progressBar = document.getElementById('progress-bar');
+    const progressCount = document.getElementById('progress-count');
+    const statusTextProgress = document.getElementById('status-text');
+    const statusState = document.getElementById('status-state');
+
     // --- 3. HELPER FUNCTIONS ---
 
     function setVideoProcessing(isProcessing) {
@@ -146,51 +153,46 @@ document.addEventListener('DOMContentLoaded', () => {
         startJobBtn.disabled = (uploadedFile === null);
     }
 
-    function showStatus(message) {
-        if (statusText) {
-            statusText.textContent = message;
-        }
-
-        // Show cancel button if it exists
-        if (cancelJobBtn) {
+        function showStatus(message) {
+            // Hide start button, show progress
             startJobBtn.classList.add('hidden');
-            cancelJobBtn.classList.remove('hidden');
-        } else {
-            startJobBtn.textContent = 'Processing...';
-            startJobBtn.disabled = true;
+            const progressContainer = document.getElementById('progress-container');
+            if (progressContainer) {
+                progressContainer.classList.remove('hidden');
+            }
+
+            const progressText = document.getElementById('progress-text');
+            if (progressText) progressText.textContent = message;
+
+            if (mainControls) {
+                mainControls.style.pointerEvents = 'none';
+                mainControls.style.opacity = '0.5';
+            }
+
+            setVideoProcessing(true);
         }
 
-        // Disable controls
-        if (mainControls) {
-            mainControls.style.pointerEvents = 'none';
-            mainControls.style.opacity = '0.5';
-        }
-
-        setVideoProcessing(true);
-    }
-
-    function hideStatus() {
-        if (statusText) {
-            statusText.textContent = 'Ready';
-        }
-
-        // Show start button, hide cancel
-        if (cancelJobBtn) {
+        function hideStatus() {
+            // Show start button, hide progress
             startJobBtn.classList.remove('hidden');
-            cancelJobBtn.classList.add('hidden');
+            const progressContainer = document.getElementById('progress-container');
+            if (progressContainer) {
+                progressContainer.classList.add('hidden');
+            }
+
+            const progressBar = document.getElementById('progress-bar');
+            if (progressBar) progressBar.style.width = '0%';
+
+            startJobBtn.disabled = (uploadedFile === null);
+            updateControls();
+
+            if (mainControls) {
+                mainControls.style.pointerEvents = 'auto';
+                mainControls.style.opacity = '1';
+            }
+
+            setVideoProcessing(false);
         }
-
-        startJobBtn.disabled = (uploadedFile === null);
-        updateControls();
-
-        // Re-enable controls
-        if (mainControls) {
-            mainControls.style.pointerEvents = 'auto';
-            mainControls.style.opacity = '1';
-        }
-
-        setVideoProcessing(false);
-    }
 
     async function cancelCurrentJob() {
         if (!currentJobId) {
@@ -229,6 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function displayMainTagResult(jobDisplayName, isClearJob = false) {
         mainResultsTitle.textContent = isClearJob ? 'Clear Complete!' : 'Tagging Complete!';
         mainTagResultContainer.innerHTML = '';
+        hideStatus();
 
         const message = document.createElement('p');
         message.className = 'text-sm text-gray-700 mb-4';
@@ -375,7 +378,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (currentJob) {
                     const jobName = currentJob.job_display_name;
-                    showStatus(`Processing ${jobName}... (Status: ${currentJob.status})`);
+                    const trackCount = currentJob.track_count || 0;
+
+                    // Update progress container text
+                    if (statusTextProgress) {
+                        statusTextProgress.textContent = `Processing ${jobName}...`;
+                    }
+
+                    // Update state indicator
+                    if (statusState) {
+                        statusState.textContent = currentJob.status;
+                    }
+
+                    // Update progress count display
+                    if (progressCount && trackCount > 0) {
+                        progressCount.textContent = `${trackCount} tracks`;
+                    } else {
+                        progressCount.textContent = 'Processing...';
+                    }
+
+                    // Show indeterminate progress (full bar pulsing)
+                    if (progressBar) {
+                        progressBar.style.width = '100%';
+                    }
 
                     if (currentJob.status === 'Completed' || currentJob.status === 'Failed') {
                         clearInterval(window.pollingIntervalId);
@@ -497,4 +522,43 @@ document.addEventListener('DOMContentLoaded', () => {
     updateControls();
     checkForActiveJobs();
 
+});
+
+// Tooltip toggle for tagging info
+document.addEventListener('DOMContentLoaded', () => {
+    const infoBtn = document.getElementById('tagging-info-btn');
+    const tooltip = document.getElementById('tagging-tooltip');
+
+    if (infoBtn && tooltip) {
+        infoBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            tooltip.classList.toggle('hidden');
+        });
+
+        // Close when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!infoBtn.contains(e.target) && !tooltip.contains(e.target)) {
+                tooltip.classList.add('hidden');
+            }
+        });
+    }
+});
+
+// Mode button hover tooltips
+document.addEventListener('DOMContentLoaded', () => {
+    const modeButtons = document.querySelectorAll('.mode-button');
+
+    modeButtons.forEach(button => {
+        const tooltip = button.parentElement.querySelector('.mode-tooltip');
+
+        if (tooltip) {
+            button.addEventListener('mouseenter', () => {
+                tooltip.classList.remove('hidden');
+            });
+
+            button.addEventListener('mouseleave', () => {
+                tooltip.classList.add('hidden');
+            });
+        }
+    });
 });
