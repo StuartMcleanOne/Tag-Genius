@@ -352,6 +352,19 @@ def log_job_end(log_id, status, track_count, output_path):
     except sqlite3.Error as e:
         print(f"Failed to update log entry for job ID {log_id}: {e}")
 
+def update_job_progress(log_id, current_count, total_count):
+    """Update job progress metadata in the database."""
+    try:
+        # Store progress as JSON in the result_data column
+        progress_data = json.dumps({"current": current_count, "total": total_count})
+        with db_cursor() as cursor:
+            cursor.execute(
+                "UPDATE processing_log SET result_data = ? WHERE id = ?",
+                (progress_data, log_id)
+            )
+    except sqlite3.Error as e:
+        print(f"Failed to update progress for job {log_id}: {e}")
+
 
 def cleanup_stale_jobs():
     """
@@ -1008,6 +1021,12 @@ def process_library_task(log_id, input_path, output_path, config):
                   f"for this track.")
 
             processed_count += 1
+
+            # --- PROGRESS UPDATE ---
+            # Update database every 5 tracks to prevent locking, or on the final track
+            if (index + 1) % 5 == 0 or (index + 1) == total_tracks:
+                update_job_progress(log_id, index + 1, total_tracks)
+            # -----------------------
 
             # SAVE BLUEPRINT
             insert_track_data(

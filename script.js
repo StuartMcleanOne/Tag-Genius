@@ -390,17 +390,41 @@ document.addEventListener('DOMContentLoaded', () => {
                         statusState.textContent = currentJob.status;
                     }
 
-                    // Update progress count display
-                    if (progressCount && trackCount > 0) {
-                        progressCount.textContent = `${trackCount} tracks`;
-                    } else {
-                        progressCount.textContent = 'Processing...';
+                    // --- NEW PROGRESS CALCULATION LOGIC ---
+                    let current = 0;
+                    let total = 0;
+                    let percent = 0;
+
+                    if (currentJob.result_data) {
+                        try {
+                            const progressData = JSON.parse(currentJob.result_data);
+                            if (progressData.current && progressData.total) {
+                                current = progressData.current;
+                                total = progressData.total;
+                                percent = Math.round((current / total) * 100);
+                            }
+                        } catch (e) {
+                            console.warn('Progress data parse error', e);
+                        }
                     }
 
-                    // Show indeterminate progress (full bar pulsing)
-                    if (progressBar) {
-                        progressBar.style.width = '100%';
+                    // Update progress text
+                    if (progressCount) {
+                        if (total > 0) {
+                            progressCount.textContent = `Processing: ${current} / ${total} tracks (${percent}%)`;
+                        } else if (trackCount > 0) {
+                            progressCount.textContent = `${trackCount} tracks processed`;
+                        } else {
+                            progressCount.textContent = 'Initializing...';
+                        }
                     }
+
+                    // Update progress bar width
+                    if (progressBar) {
+                        progressBar.style.width = total > 0 ? `${percent}%` : '5%';
+                        progressBar.style.transition = 'width 0.5s ease-in-out';
+                    }
+                    // --------------------------------------
 
                     if (currentJob.status === 'Completed' || currentJob.status === 'Failed') {
                         clearInterval(window.pollingIntervalId);
