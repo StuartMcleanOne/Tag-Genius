@@ -352,17 +352,6 @@ def log_job_end(log_id, status, track_count, output_path):
     except sqlite3.Error as e:
         print(f"Failed to update log entry for job ID {log_id}: {e}")
 
-def update_job_progress(log_id, current_count, total_count):
-    """Update job progress metadata in the database."""
-    try:
-        # Store progress as JSON in the result_data column
-        progress_data = json.dumps({"current": current_count, "total": total_count})
-        with db_cursor() as cursor:
-            cursor.execute(
-                "UPDATE processing_log SET result_data = ? WHERE id = ?",
-                (progress_data, log_id)
-            )
-    except sqlite3.Error as e:
         print(f"Failed to update progress for job {log_id}: {e}")
 
 
@@ -701,7 +690,7 @@ def get_primary_genre(track_element):
     return primary_genre
 
 
-def split_xml_by_genre(input_path, job_folder_path):
+def split_xml_by_genre(input_path, job_folder_path, log_id=None):
     """Parse Rekordbox XML, group tracks by genre, and save split files."""
     print(f"Starting split process for file: {input_path} "
           f"into folder: {job_folder_path}")
@@ -724,9 +713,10 @@ def split_xml_by_genre(input_path, job_folder_path):
             if primary_genre not in genre_groups:
                 genre_groups[primary_genre] = []
             genre_groups[primary_genre].append(track)
-            if (i + 1) % 50 == 0:
-                print(f"Processed {i + 1}/{len(tracks)} tracks "
-                      f"for initial genre sorting...")
+            if (i + 1) % 10 == 0 or (i + 1) == len(tracks):
+                print(f"Processed {i + 1}/{len(tracks)} tracks for initial genre sorting... ")
+                if log_id:  # ← ADD THIS
+                    update_job_progress(log_id, i + 1, len(tracks))
 
         print(f"Finished Stage 1. Found raw genres: "
               f"{list(genre_groups.keys())}")
@@ -818,7 +808,7 @@ def clear_ai_tags(track_element):
 def split_library_task(log_id, input_path, job_folder_path):
     """Celery task to orchestrate library splitting in background."""
     try:
-        created_files = split_xml_by_genre(input_path, job_folder_path)
+        created_files = split_xml_by_genre(input_path, job_folder_path,log_id)
 
         outputs_base_path = os.path.abspath("outputs")
         relative_paths = [
@@ -879,7 +869,6 @@ def process_library_task(log_id, input_path, output_path, config):
             if check_job and check_job['status'] != 'In Progress':
                 print(f"Job {log_id} was cancelled externally. Terminating worker now.")
                 return {"error": "Job Cancelled by User"}
-            # --- END OF NEW ZOMBIE CHECK ---
 
             track_name = track.get('Name')
             artist = track.get('Artist')
@@ -1042,7 +1031,7 @@ def process_library_task(log_id, input_path, output_path, config):
             # Update database every 5 tracks to prevent locking, or on the final track
             if (index + 1) % 5 == 0 or (index + 1) == total_tracks:
                 update_job_progress(log_id, index + 1, total_tracks)
-            # -----------------------
+
 
             # SAVE BLUEPRINT
             insert_track_data(
@@ -1071,6 +1060,26 @@ def process_library_task(log_id, input_path, output_path, config):
         log_job_end(log_id, 'Failed', 0, output_path)
         print(f"FATAL error during tagging job {log_id}: {e}")
         return {"error": f"Failed to process XML: {str(e)}"}
+
+
+def update_job_progress(job_id, current, total):
+    """Update job progress in database for frontend polling."""
+    print(f"🔥 PROGRESS UPDATE CALLED: {current}/{total}")  # ← ADD THIS LINE
+    try:
+        progress_data = json.dumps({
+            "current": current,
+            "total": total
+        })
+
+        with db_cursor() as cursor:
+            cursor.execute(
+                "UPDATE processing_log SET result_data = ? WHERE id = ?",
+                (progress_data, job_id)
+            )
+
+        print(f"✅ PROGRESS WRITTEN TO DB: {current}/{total}")
+    except Exception as e:
+        print(f"❌ PROGRESS UPDATE FAILED: {e}")
 
 # --- FLASK ROUTES ---
 
