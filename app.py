@@ -864,7 +864,23 @@ def process_library_task(log_id, input_path, output_path, config):
         print(f"Found {total_tracks} tracks. Starting tagging process...")
 
         processed_count = 0
+
         for index, track in enumerate(tracks):
+
+            # Check database to see if user hit Stop/Cancel
+            # This runs inside the loop for EVERY track to ensure immediate stopping
+            with db_cursor() as cursor:
+                check_job = cursor.execute(
+                    "SELECT status FROM processing_log WHERE id = ?",
+                    (log_id,)
+                ).fetchone()
+
+            # If status is no longer 'In Progress' (e.g. 'Failed' or 'Cancelled'), kill this task immediately
+            if check_job and check_job['status'] != 'In Progress':
+                print(f"Job {log_id} was cancelled externally. Terminating worker now.")
+                return {"error": "Job Cancelled by User"}
+            # --- END OF NEW ZOMBIE CHECK ---
+
             track_name = track.get('Name')
             artist = track.get('Artist')
             print(f"\nProcessing track {index + 1}/{total_tracks}: "
@@ -938,7 +954,7 @@ def process_library_task(log_id, input_path, output_path, config):
                 g for g in primary_genre + sub_genre if g
             )
             track.set('Genre', new_genre_string if new_genre_string
-                      else track.get('Genre', ''))
+            else track.get('Genre', ''))
 
             # Format comments
             tag_order_and_prefixes = {
@@ -1055,7 +1071,6 @@ def process_library_task(log_id, input_path, output_path, config):
         log_job_end(log_id, 'Failed', 0, output_path)
         print(f"FATAL error during tagging job {log_id}: {e}")
         return {"error": f"Failed to process XML: {str(e)}"}
-
 
 # --- FLASK ROUTES ---
 

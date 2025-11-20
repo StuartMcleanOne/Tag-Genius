@@ -2,258 +2,184 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tag Genius</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="preload" href="vj_loop_4_BW.mp4_compressed.mp4" as="video" type="video/mp4">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>TAG AMP CONSOLE</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="script.js" defer></script>
 </head>
-<body class="bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen p-4">
+<body>
 
-    <!-- VJ LOOP BACKGROUND -->
     <video muted loop playsinline id="vj-background" class="paused">
         <source src="vj_loop_4_BW.mp4_compressed.mp4" type="video/mp4">
-        Your browser does not support the video tag.
     </video>
 
-    <!-- HEADER NAVIGATION -->
-    <header class="w-full max-w-7xl mx-auto mb-6 rounded-xl">
-        <nav class="flex items-center justify-center p-4">
-            <div class="flex items-center space-x-12">
-                <a href="history.html" class="nav-link text-sm font-medium text-white hover:text-blue-400 transition-colors">HISTORY</a>
-                <a href="index.html" class="nav-link nav-link-active text-sm font-medium text-white hover:text-blue-400 transition-colors">TAG GENIUS</a>
-                <a href="workspace.html" class="nav-link text-sm font-medium text-white hover:text-blue-400 transition-colors">WORKSPACE</a>
-            </div>
-        </nav>
-    </header>
+    <div class="console-frame">
 
-    <!-- MAIN GLASS CONTAINER -->
-    <div class="glass-container rounded-xl shadow-2xl p-7 w-full max-w-4xl mx-auto min-h-[500px] relative">
-
-
-        <!-- LOGO (ABSOLUTE POSITIONED, TOP LEFT) -->
-        <img src="Tag_Genius_Logo_6.png" alt="Tag Genius" class="absolute top-8 left-8 drop-shadow-2xl" style="width: 250px; height: 160px; z-index: 4;">
-
-        <!-- MAIN UPLOAD AREA -->
-        <div id="main-upload-area" class="space-y-8">
-
-            <!-- TOP ROW: UPLOAD BOX (TOP RIGHT) -->
-            <div class="flex justify-end mb-8">
-                <div id="drag-area" class="drag-area w-70">
-                    <p class="text-sm text-blue-600 font-medium">Drag & drop your XML file here</p>
-                    <p class="text-xs text-gray-500 mt-1">or click to browse</p>
-                    <input type="file" id="file-input" class="hidden" accept=".xml">
+        <div class="monitor-section">
+            <div class="screen-header">
+                <div class="text-gray-500 tracking-widest">TAG_AMP_V.1.0</div>
+                <div class="nav-group">
+                    <span class="channel-switch active" id="nav-deck" onclick="switchView('deck')">[ DECK ]</span>
+                    <span class="channel-switch" id="nav-logs" onclick="switchView('logs')">[ LOGS ]</span>
+                    <span class="channel-switch" id="nav-workspace" onclick="switchView('workspace')">[ WORKSPACE ]</span>
                 </div>
             </div>
 
-            <!-- MODE SELECTOR -->
-            <div id="main-controls" class="space-y-4">
-                <label class="block text-lg font-medium text-white">Mode Selector</label>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <!-- TAG LIBRARY -->
-                    <div class="relative">
-                        <input type="radio" name="mode" id="mode-tag" value="tag" class="hidden" checked>
-                        <label for="mode-tag" class="block p-6 rounded-lg cursor-pointer text-center mode-button">
-                            <span class="font-semibold text-base">Tag Library</span>
-                            <span class="block text-sm mt-1 text-gray-300">Add AI tags</span>
-                        </label>
-                        <div class="mode-tooltip hidden absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-3 bg-gray-900 rounded-lg border border-gray-700 text-xs text-gray-300 shadow-2xl z-50">
-                            AI analyzes each track and adds genre, energy, vibe, situation, components, and time period to your library.
-                        </div>
-                    </div>
+            <div id="view-deck" class="h-full flex flex-col relative">
+                <div id="drag-area" class="drop-zone flex-1 flex flex-col justify-center items-center border-2 border-dashed border-gray-800 text-gray-600 hover:text-cyan-400 hover:border-cyan-400 transition-colors cursor-pointer">
+                    <div class="text-4xl mb-2 tracking-widest">[ INSERT DISK ]</div>
+                    <div class="text-xl opacity-70">DRAG XML OR CLICK LOAD</div>
+                    <div id="file-name-display" class="text-cyan-400 mt-6 text-2xl hidden tracking-wider"></div>
+                </div>
+                <input type="file" id="file-input" class="hidden" accept=".xml">
 
-                    <!-- SPLIT LIBRARY -->
-                    <div class="relative">
-                        <input type="radio" name="mode" id="mode-split" value="split" class="hidden">
-                        <label for="mode-split" class="block p-6 rounded-lg cursor-pointer text-center mode-button">
-                            <span class="font-semibold text-base">Split Library</span>
-                            <span class="block text-sm mt-1 text-gray-300">By genre</span>
-                        </label>
-                        <div class="mode-tooltip hidden absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-3 bg-gray-900 rounded-lg border border-gray-700 text-xs text-gray-300 shadow-2xl z-50">
-                            Automatically organizes your library into separate XML files by main genre (Electronic, Hip Hop, Rock, etc.).
-                        </div>
-                    </div>
-
-                    <!-- CLEAR TAGS -->
-                    <div class="relative">
-                        <input type="radio" name="mode" id="mode-clear" value="clear" class="hidden">
-                        <label for="mode-clear" class="block p-6 rounded-lg cursor-pointer text-center mode-button">
-                            <span class="font-semibold text-base">Clear Tags</span>
-                            <span class="block text-sm mt-1 text-gray-300">Remove AI tags</span>
-                        </label>
-                        <div class="mode-tooltip hidden absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-3 bg-gray-900 rounded-lg border border-gray-700 text-xs text-gray-300 shadow-2xl z-50">
-                            Removes all AI-generated tags from your library. Your original manual tags and track data remain untouched.
-                        </div>
-                    </div>
+                <div id="main-results-area" class="hidden absolute bottom-0 left-0 right-0 p-4 border-t border-cyan-900 bg-black/95 text-cyan-400 z-10">
+                    <div id="main-tag-result-container" class="flex justify-between items-center"></div>
                 </div>
             </div>
 
-            <!-- DYNAMIC OPTIONS AREA -->
-            <div class="relative">
-
-                <!-- TAGGING LEVEL OPTIONS -->
-                <div id="tagging-level-options" class="space-y-6">
-                    <div class="flex items-center gap-2 mb-2">
-                        <label class="block text-lg font-medium text-white">Tagging Detail</label>
-                        <button type="button" id="tagging-info-btn" class="group relative">
-                            <svg class="w-5 h-5 text-gray-400 hover:text-white transition-colors" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-                            </svg>
-                            <!-- TOOLTIP -->
-                            <div id="tagging-tooltip" class="hidden absolute left-0 top-8 z-999 w-96 p-4 bg-gray-900 rounded-lg border border-gray-700 text-left shadow-2xl">
-                                <h3 class="text-sm font-bold text-white mb-3">How Tagging Works</h3>
-
-                                <div class="space-y-3 text-xs text-gray-300">
-                                    <div>
-                                        <p class="font-semibold text-white mb-1">Energy Rating (1-10):</p>
-                                        <p class="mb-2">Becomes star rating (1-5 stars) AND color dot:</p>
-                                        <div class="grid grid-cols-5 gap-2 text-xs">
-                                            <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full" style="background:#FF007F"></span><span>9-10: Pink</span></div>
-                                            <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full" style="background:#FFA500"></span><span>8: Orange</span></div>
-                                            <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full" style="background:#FFFF00"></span><span>6-7: Yellow</span></div>
-                                            <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full" style="background:#00FF00"></span><span>4-5: Green</span></div>
-                                            <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full" style="background:#25FDE9"></span><span>1-3: Aqua</span></div>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <p class="font-semibold text-white mb-1">Detail Levels:</p>
-                                        <p><strong>Essential:</strong> 1 tag per category</p>
-                                        <p><strong>Recommended:</strong> 2 tags per category (best balance)</p>
-                                        <p><strong>Detailed:</strong> 3 tags per category (comprehensive)</p>
-                                    </div>
-
-                                    <div>
-                                        <p class="font-semibold text-white">All tags written to Comments field except Genre (→ Genre field) and Energy (→ Stars + Color)</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </button>
-                    </div>
-                    <div class="space-y-2 p-4 bg-gray-800 bg-opacity-50 rounded-lg">
-                        <label class="block text-sm font-medium text-gray-300">Detail Level</label>
-                        <div class="flex w-full bg-gray-700 bg-opacity-50 rounded-lg p-1">
-                            <input type="radio" name="tag-level" id="level-essential" value="2" class="hidden">
-                            <label for="level-essential" class="w-1/3 text-center text-sm p-2 rounded-md cursor-pointer font-medium text-gray-300">Essential</label>
-
-                            <input type="radio" name="tag-level" id="level-recommended" value="3" class="hidden" checked>
-                            <label for="level-recommended" class="w-1/3 text-center text-sm p-2 rounded-md cursor-pointer font-medium text-gray-300">Recommended</label>
-
-                            <input type="radio" name="tag-level" id="level-detailed" value="4" class="hidden">
-                            <label for="level-detailed" class="w-1/3 text-center text-sm p-2 rounded-md cursor-pointer font-medium text-gray-300">Detailed</label>
-                        </div>
-                    </div>
-
-                    <!-- TAG PREVIEW CONTAINER -->
-                    <div id="tag-preview-container" class="pt-2">
-                        <div class="space-y-2 p-4 bg-gray-800 bg-opacity-50 rounded-lg">
-
-                            <!-- ESSENTIAL PREVIEW -->
-                            <div id="essential-preview" class="hidden">
-                                <div class="flex flex-wrap items-center justify-between gap-x-5 gap-y-2">
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">SUB GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">ENERGY</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">VIBE</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">SITUATION</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">COMPONENTS</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">YEAR</span><div class="dot-group"><span class="dot"></span></div></div>
-                                </div>
-                            </div>
-
-                            <!-- RECOMMENDED PREVIEW -->
-                            <div id="recommended-preview">
-                                <div class="flex flex-wrap items-center justify-between gap-x-5 gap-y-2">
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">SUB GENRE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">ENERGY</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">VIBE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">SITUATION</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">COMPONENTS</span><div class="dot-group"><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">YEAR</span><div class="dot-group"><span class="dot"></span></div></div>
-                                </div>
-                            </div>
-
-                            <!-- DETAILED PREVIEW -->
-                            <div id="detailed-preview" class="hidden">
-                                <div class="flex flex-wrap items-center justify-between gap-x-5 gap-y-2">
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">GENRE</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">SUB GENRE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">ENERGY</span><div class="dot-group"><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">VIBE</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">SITUATION</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">COMPONENTS</span><div class="dot-group"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
-                                    <div class="flex items-center space-x-1"><span class="text-xs font-medium text-white tracking-wider">YEAR</span><div class="dot-group"><span class="dot"></span></div></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- SPLIT DESCRIPTION -->
-                    <div id="split-description" class="hidden p-6 bg-blue-50 border border-blue-200 rounded-lg text-base text-blue-800 space-y-3">
-                        <strong class="font-semibold text-lg">Split Library by Genre</strong>
-                        <p>This mode creates separate XML files for each genre in your library (e.g., "Electronic.xml", "Hip_Hop.xml", "Rock.xml").</p>
-                        <p class="text-sm">💡 <strong>Tip:</strong> Use this to organize large libraries before tagging. You can then tag each genre file individually with genre-specific settings for better results.</p>
-                    </div>
-
-                    <!-- CLEAR DESCRIPTION -->
-                    <div id="clear-description" class="hidden p-6 bg-yellow-50 border border-yellow-200 rounded-lg text-base text-yellow-800 space-y-3">
-                        <strong class="font-semibold text-lg">Clear AI Tags</strong>
-                        <p>This mode removes all AI-generated tags from your library, including Genre, Sub-genre, Energy, Vibe, Situation, Components, and Year data.</p>
-                        <p class="text-sm">⚠️ <strong>Note:</strong> This action cannot be undone. Your original manual tags and track data will not be affected. Use this to start fresh or remove outdated AI tags.</p>
-                    </div>
+            <div id="view-logs" class="hidden h-full flex flex-col">
+                <div class="flex justify-between text-gray-600 border-b border-gray-800 pb-2 mb-2 text-xl tracking-wider">
+                    <span class="w-32">TIMESTAMP</span>
+                    <span class="flex-1 pl-4">JOB TYPE / FILENAME</span>
+                    <span class="w-32 text-right">STATUS</span>
                 </div>
+                <div id="history-container" class="overflow-y-auto pr-2 flex-1 space-y-1"></div>
             </div>
 
-        <!-- START BUTTON / PROGRESS BAR COMBO -->
-        <div class="pt-8">
-            <!-- START BUTTON (shown when idle) -->
-            <button id="start-job-btn" class="w-full px-10 py-6 bg-white text-blue-900 font-semibold text-xl rounded-xl shadow-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
-                Start Tagging
-            </button>
-
-            <!-- PROGRESS BAR (shown when processing) -->
-            <div id="progress-container" class="hidden">
-                <div class="relative w-full h-16 bg-gray-800 rounded-xl overflow-hidden border border-gray-700 mb-4">
-                    <div id="progress-bar" class="h-full bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 transition-all" style="width: 0%"></div>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center">
-                        <span id="progress-text" class="text-sm font-bold text-white drop-shadow-lg">Processing...</span>
-                        <span id="progress-count" class="text-xs text-gray-300 mt-1">This may take a while</span>
-                    </div>
+            <div id="view-workspace" class="hidden h-full flex flex-col">
+                 <div class="flex justify-between text-gray-600 border-b border-gray-800 pb-2 mb-2 text-xl tracking-wider">
+                    <span>FILENAME</span>
+                    <span>ACTIONS</span>
                 </div>
-
-                <button id="cancel-job-btn" class="w-full px-10 py-4 bg-red-600 text-white font-semibold text-lg rounded-xl shadow-lg hover:bg-red-700 transition-all">
-                    Cancel Job
-                </button>
+                <ul id="workspace-files-list" class="overflow-y-auto pr-2 flex-1 space-y-1"></ul>
             </div>
         </div>
 
-        <!-- MAIN RESULTS AREA -->
-        <div id="main-results-area" class="hidden space-y-2 p-6 bg-green-50 border border-green-200 rounded-lg">
-            <h3 id="main-results-title" class="text-lg font-semibold text-green-800">Job Complete!</h3>
-            <div id="main-tag-result-container"></div>
+        <div class="eq-section">
+            <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-3">
+                    <div id="system-status-led" class="status-led"></div>
+                    <div class="text-gray-600 text-2xl tracking-widest" id="tag-detail-label">TAG DETAIL</div>
+                </div>
+
+                <div id="tagging-level-options" class="flex gap-1 border border-gray-800 p-1 bg-black/50">
+                    <div class="slider-option" data-level="2" onclick="setDetail(2)"><div class="slider-marker"></div>ESSENTIAL</div>
+                    <div class="slider-option active" data-level="3" onclick="setDetail(3)"><div class="slider-marker"></div>RECOMMENDED</div>
+                    <div class="slider-option" data-level="4" onclick="setDetail(4)"><div class="slider-marker"></div>DETAILED</div>
+                </div>
+                <div class="hidden">
+                    <input type="radio" name="tag-level" id="level-essential" value="2">
+                    <input type="radio" name="tag-level" id="level-recommended" value="3" checked>
+                    <input type="radio" name="tag-level" id="level-detailed" value="4">
+                </div>
+            </div>
+
+            <div class="flex text-gray-500 text-lg mb-1 tracking-wider" id="eq-headers">
+                <div class="w-[28%] pl-1">GENRE FIELD</div>
+                <div class="text-gray-700">/</div>
+                <div class="flex-1 pl-4">COMMENTS FIELD</div>
+            </div>
+
+            <div class="viz-track-container mb-5" id="eq-visualizer">
+                <div class="viz-group">
+                    <div class="viz-label">GENRE</div>
+                    <div class="viz-dashes"><div class="dash"></div></div>
+                </div>
+
+                <div class="viz-group">
+                    <div class="viz-label">SUB GENRE</div>
+                    <div class="viz-dashes"><div class="dash"></div><div class="dash"></div><div class="dash"></div></div>
+                </div>
+
+                <div class="viz-divider">/</div>
+
+                <div class="viz-group">
+                    <div class="viz-label">ENERGY</div>
+                    <div class="viz-dashes"><div class="dash"></div></div>
+                </div>
+                <div class="viz-group">
+                    <div class="viz-label">VIBE</div>
+                    <div class="viz-dashes"><div class="dash"></div><div class="dash"></div><div class="dash"></div></div>
+                </div>
+
+                <div class="viz-group">
+                    <div class="viz-label">SITUATION</div>
+                    <div class="viz-dashes"><div class="dash"></div><div class="dash"></div><div class="dash"></div></div>
+                </div>
+
+                <div class="viz-group">
+                    <div class="viz-label">COMPONENTS</div>
+                    <div class="viz-dashes"><div class="dash"></div><div class="dash"></div><div class="dash"></div></div>
+                </div>
+
+                <div class="viz-group">
+                    <div class="viz-label">YEAR</div>
+                    <div class="viz-dashes"><div class="dash"></div></div>
+                </div>
+            </div>
+
+            <div class="text-gray-600 text-sm mb-1 tracking-wider">ENERGY RATING ALSO GIVEN AS COLOUR AND STARS</div>
+            <div class="legend-row text-gray-500">
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center gap-2"><span class="dot" style="background:#d946ef"></span><span class="text-silver">★</span> BANGER</div>
+                    <div class="flex items-center gap-2"><span class="dot" style="background:#f97316"></span><span class="text-silver">★</span> HIGH</div>
+                    <div class="flex items-center gap-2"><span class="dot" style="background:#eab308"></span><span class="text-silver">★</span> MED</div>
+                    <div class="flex items-center gap-2"><span class="dot" style="background:#00ff00"></span><span class="text-silver">★</span> LOW</div>
+                    <div class="flex items-center gap-2"><span class="dot" style="background:#25FDE9"></span><span class="text-silver">★</span> CHILL</div>
+                </div>
+                <div class="flex-1"></div>
+                <div class="flex items-center gap-2"><span class="dot" style="background:#ef4444"></span> RESPECTED AS DELETE</div>
+            </div>
+        </div>
+
+        <div class="deck-section">
+        <div class="deck-section">
+    <div class="progress-row">
+        <div class="text-gray-500 text-xl tracking-widest">PROGRESS</div>
+        <div class="progress-track">
+            <div id="progress-bar" class="progress-fill"></div>
+        </div>
+    </div>
+
+    <div class="controls-grid relative">
+
+        <div class="btn-group">
+            <button class="pixel-btn btn-mode active" id="btn-mode-tag" onclick="setMode('tag')">TAG</button>
+            <button class="pixel-btn btn-mode" id="btn-mode-split" onclick="setMode('split')">SPLIT</button>
+            <button class="pixel-btn btn-mode" id="btn-mode-clear" onclick="setMode('clear')">CLEAR</button>
+            <div class="hidden">
+                <input type="radio" name="mode" id="mode-tag" value="tag" checked>
+                <input type="radio" name="mode" id="mode-split" value="split">
+                <input type="radio" name="mode" id="mode-clear" value="clear">
+            </div>
+        </div>
+
+        <div class="transport-group">
+            <button class="pixel-btn btn-transport btn-stop" id="cancel-job-btn" title="STOP">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>
+            </button>
+            <button class="pixel-btn btn-transport btn-play" id="start-job-btn" title="PLAY">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+        </div>
+
+        <div class="btn-group">
+            <div class="data-display">
+                <div class="tracker-text text-gray-600">[ <span id="count-display" class="text-cyan-400">0 / 0</span> ]</div>
+                <div class="deck-clock" id="job-timer">/00:00:00</div>
+            </div>
+            <button class="pixel-btn btn-load" onclick="document.getElementById('file-input').click()" title="LOAD DISK">
+                LOAD
+            </button>
         </div>
 
     </div>
 
-    <!-- SVG FILTERS -->
-    <svg style="display: none">
-        <filter id="glass-distortion" x="-20%" y="-20%" width="140%" height="140%" filterUnits="objectBoundingBox">
-            <feTurbulence type="fractalNoise" baseFrequency="0.015 0.015" numOctaves="2" seed="5" result="turbulence" />
-            <feGaussianBlur in="turbulence" stdDeviation="2" result="softMap" />
-            <feSpecularLighting in="softMap" surfaceScale="8" specularConstant="1.5" specularExponent="120" lighting-color="#ffffff" result="specLight">
-                <fePointLight x="-100" y="-100" z="400" />
-            </feSpecularLighting>
-            <feComposite in="specLight" in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.8" k3="0.4" k4="0" result="litImage" />
-            <feDisplacementMap in="litImage" in2="softMap" scale="35" xChannelSelector="R" yChannelSelector="G" result="displaced" />
-            <feBlend in="displaced" in2="SourceGraphic" mode="normal" />
-        </filter>
-    </svg>
+    <div id="status-text" class="absolute bottom-20 left-0 right-0 text-center text-gray-600 pointer-events-none tracking-widest">READY</div>
+</div></div>
 
-
-    </body>
+    </div>
+</body>
 </html>
