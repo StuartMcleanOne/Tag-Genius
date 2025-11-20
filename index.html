@@ -2,184 +2,251 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>TAG AMP CONSOLE</title>
-    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TAG_AMP_V.2.0</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="script.js" defer></script>
 </head>
 <body>
-
-    <video muted loop playsinline id="vj-background" class="paused">
-        <source src="vj_loop_4_BW.mp4_compressed.mp4" type="video/mp4">
+    <!-- VIDEO BACKGROUND -->
+    <video muted loop playsinline id="vj-background">
+        <source src="vj4longtriple_web.mp4" type="video/mp4">
     </video>
 
+    <!-- CONSOLE FRAME -->
     <div class="console-frame">
 
+        <!-- MONITOR SECTION -->
         <div class="monitor-section">
             <div class="screen-header">
-                <div class="text-gray-500 tracking-widest">TAG_AMP_V.1.0</div>
+                <div class="header-left">TAG_AMP_V.2.0</div>
                 <div class="nav-group">
-                    <span class="channel-switch active" id="nav-deck" onclick="switchView('deck')">[ DECK ]</span>
-                    <span class="channel-switch" id="nav-logs" onclick="switchView('logs')">[ LOGS ]</span>
-                    <span class="channel-switch" id="nav-workspace" onclick="switchView('workspace')">[ WORKSPACE ]</span>
+                    <div class="nav-btn active" data-view="deck">[ DECK ]</div>
+                    <div class="nav-btn" data-view="logs">[ LOGS ]</div>
+                    <div class="nav-btn" data-view="workspace">[ WORKSPACE ]</div>
                 </div>
             </div>
 
-            <div id="view-deck" class="h-full flex flex-col relative">
-                <div id="drag-area" class="drop-zone flex-1 flex flex-col justify-center items-center border-2 border-dashed border-gray-800 text-gray-600 hover:text-cyan-400 hover:border-cyan-400 transition-colors cursor-pointer">
-                    <div class="text-4xl mb-2 tracking-widest">[ INSERT DISK ]</div>
-                    <div class="text-xl opacity-70">DRAG XML OR CLICK LOAD</div>
-                    <div id="file-name-display" class="text-cyan-400 mt-6 text-2xl hidden tracking-wider"></div>
+            <!-- DECK VIEW -->
+            <div class="view-container active" id="view-deck">
+                <div class="drop-zone" id="drop-zone">
+                    <div class="drop-text-large">[ INSERT DISK ]</div>
+                    <div class="drop-text-small">DRAG XML OR CLICK LOAD</div>
+                    <div class="file-display hidden" id="file-display"></div>
                 </div>
-                <input type="file" id="file-input" class="hidden" accept=".xml">
-
-                <div id="main-results-area" class="hidden absolute bottom-0 left-0 right-0 p-4 border-t border-cyan-900 bg-black/95 text-cyan-400 z-10">
-                    <div id="main-tag-result-container" class="flex justify-between items-center"></div>
+                <div class="result-panel" id="result-panel">
+                    <div id="result-text"></div>
+                    <button class="download-btn" id="download-btn">DOWNLOAD</button>
                 </div>
             </div>
 
-            <div id="view-logs" class="hidden h-full flex flex-col">
-                <div class="flex justify-between text-gray-600 border-b border-gray-800 pb-2 mb-2 text-xl tracking-wider">
-                    <span class="w-32">TIMESTAMP</span>
-                    <span class="flex-1 pl-4">JOB TYPE / FILENAME</span>
-                    <span class="w-32 text-right">STATUS</span>
+            <!-- LOGS VIEW -->
+            <div class="view-container" id="view-logs">
+                <div class="logs-header">
+                    <span style="width: 120px;">TIMESTAMP</span>
+                    <span style="flex: 1; padding-left: 20px;">JOB TYPE / FILENAME</span>
+                    <span style="width: 120px; text-align: right;">STATUS</span>
                 </div>
-                <div id="history-container" class="overflow-y-auto pr-2 flex-1 space-y-1"></div>
+                <div class="logs-list" id="logs-list">
+                    <!-- Logs will be populated by JS -->
+                </div>
             </div>
 
-            <div id="view-workspace" class="hidden h-full flex flex-col">
-                 <div class="flex justify-between text-gray-600 border-b border-gray-800 pb-2 mb-2 text-xl tracking-wider">
+            <!-- WORKSPACE VIEW -->
+            <div class="view-container" id="view-workspace">
+                <div class="logs-header">
                     <span>FILENAME</span>
                     <span>ACTIONS</span>
                 </div>
-                <ul id="workspace-files-list" class="overflow-y-auto pr-2 flex-1 space-y-1"></ul>
+                <div class="workspace-list" id="workspace-list">
+                    <!-- Workspace files will be populated by JS -->
+                </div>
             </div>
         </div>
 
-        <div class="eq-section">
-            <div class="flex justify-between items-start mb-3">
-                <div class="flex items-center gap-3">
-                    <div id="system-status-led" class="status-led"></div>
-                    <div class="text-gray-600 text-2xl tracking-widest" id="tag-detail-label">TAG DETAIL</div>
+        <!-- EQ SECTION -->
+        <div class="eq-section" id="eq-section">
+            <!-- TOP ROW: LED + TAG DETAIL + LEVEL BUTTONS -->
+            <div class="eq-top">
+                <div class="eq-left">
+                    <div class="status-led" id="status-led"></div>
+                    <div class="tag-detail-label">TAG DETAIL</div>
                 </div>
-
-                <div id="tagging-level-options" class="flex gap-1 border border-gray-800 p-1 bg-black/50">
-                    <div class="slider-option" data-level="2" onclick="setDetail(2)"><div class="slider-marker"></div>ESSENTIAL</div>
-                    <div class="slider-option active" data-level="3" onclick="setDetail(3)"><div class="slider-marker"></div>RECOMMENDED</div>
-                    <div class="slider-option" data-level="4" onclick="setDetail(4)"><div class="slider-marker"></div>DETAILED</div>
-                </div>
-                <div class="hidden">
-                    <input type="radio" name="tag-level" id="level-essential" value="2">
-                    <input type="radio" name="tag-level" id="level-recommended" value="3" checked>
-                    <input type="radio" name="tag-level" id="level-detailed" value="4">
+                <div class="level-options">
+                    <div class="level-btn" data-level="2">
+                        <div class="level-marker"></div>
+                        ESSENTIAL
+                    </div>
+                    <div class="level-btn active" data-level="3">
+                        <div class="level-marker"></div>
+                        RECOMMENDED
+                    </div>
+                    <div class="level-btn" data-level="4">
+                        <div class="level-marker"></div>
+                        DETAILED
+                    </div>
                 </div>
             </div>
 
-            <div class="flex text-gray-500 text-lg mb-1 tracking-wider" id="eq-headers">
-                <div class="w-[28%] pl-1">GENRE FIELD</div>
-                <div class="text-gray-700">/</div>
-                <div class="flex-1 pl-4">COMMENTS FIELD</div>
+            <!-- HEADERS ROW -->
+            <div class="eq-headers">
+                <div class="genre-label">GENRE FIELD</div>
+                <div class="divider">/</div>
+                <div class="comments-label">COMMENTS FIELD</div>
             </div>
 
-            <div class="viz-track-container mb-5" id="eq-visualizer">
+            <!-- VISUALIZER TRACK -->
+            <div class="viz-track">
                 <div class="viz-group">
                     <div class="viz-label">GENRE</div>
-                    <div class="viz-dashes"><div class="dash"></div></div>
+                    <div class="viz-dashes">
+                        <div class="dash active"></div>
+                    </div>
                 </div>
+
+                <div class="viz-divider">/</div>
 
                 <div class="viz-group">
                     <div class="viz-label">SUB GENRE</div>
-                    <div class="viz-dashes"><div class="dash"></div><div class="dash"></div><div class="dash"></div></div>
+                    <div class="viz-dashes">
+                        <div class="dash active"></div>
+                        <div class="dash active"></div>
+                        <div class="dash active"></div>
+                    </div>
                 </div>
 
                 <div class="viz-divider">/</div>
 
                 <div class="viz-group">
                     <div class="viz-label">ENERGY</div>
-                    <div class="viz-dashes"><div class="dash"></div></div>
+                    <div class="viz-dashes">
+                        <div class="dash active"></div>
+                    </div>
                 </div>
+
+                <div class="viz-divider">/</div>
+
                 <div class="viz-group">
                     <div class="viz-label">VIBE</div>
-                    <div class="viz-dashes"><div class="dash"></div><div class="dash"></div><div class="dash"></div></div>
+                    <div class="viz-dashes">
+                        <div class="dash active"></div>
+                        <div class="dash active"></div>
+                        <div class="dash active"></div>
+                    </div>
                 </div>
+
+                <div class="viz-divider">/</div>
 
                 <div class="viz-group">
                     <div class="viz-label">SITUATION</div>
-                    <div class="viz-dashes"><div class="dash"></div><div class="dash"></div><div class="dash"></div></div>
+                    <div class="viz-dashes">
+                        <div class="dash active"></div>
+                        <div class="dash active"></div>
+                        <div class="dash active"></div>
+                    </div>
                 </div>
+
+                <div class="viz-divider">/</div>
 
                 <div class="viz-group">
                     <div class="viz-label">COMPONENTS</div>
-                    <div class="viz-dashes"><div class="dash"></div><div class="dash"></div><div class="dash"></div></div>
+                    <div class="viz-dashes">
+                        <div class="dash active"></div>
+                        <div class="dash active"></div>
+                        <div class="dash active"></div>
+                    </div>
                 </div>
+
+                <div class="viz-divider">/</div>
 
                 <div class="viz-group">
                     <div class="viz-label">YEAR</div>
-                    <div class="viz-dashes"><div class="dash"></div></div>
+                    <div class="viz-dashes">
+                        <div class="dash active"></div>
+                    </div>
                 </div>
             </div>
 
-            <div class="text-gray-600 text-sm mb-1 tracking-wider">ENERGY RATING ALSO GIVEN AS COLOUR AND STARS</div>
-            <div class="legend-row text-gray-500">
-                <div class="flex items-center gap-6">
-                    <div class="flex items-center gap-2"><span class="dot" style="background:#d946ef"></span><span class="text-silver">★</span> BANGER</div>
-                    <div class="flex items-center gap-2"><span class="dot" style="background:#f97316"></span><span class="text-silver">★</span> HIGH</div>
-                    <div class="flex items-center gap-2"><span class="dot" style="background:#eab308"></span><span class="text-silver">★</span> MED</div>
-                    <div class="flex items-center gap-2"><span class="dot" style="background:#00ff00"></span><span class="text-silver">★</span> LOW</div>
-                    <div class="flex items-center gap-2"><span class="dot" style="background:#25FDE9"></span><span class="text-silver">★</span> CHILL</div>
+            <!-- LEGEND -->
+            <div class="legend">ENERGY RATING ALSO GIVEN AS COLOUR AND STARS</div>
+            <div class="legend-row">
+                <div class="legend-left">
+                    <div class="legend-item">
+                        <div class="dot" style="background:#d946ef"></div>
+                        <span class="star">★</span>
+                        BANGER
+                    </div>
+                    <div class="legend-item">
+                        <div class="dot" style="background:#f97316"></div>
+                        <span class="star">★</span>
+                        HIGH
+                    </div>
+                    <div class="legend-item">
+                        <div class="dot" style="background:#eab308"></div>
+                        <span class="star">★</span>
+                        MED
+                    </div>
+                    <div class="legend-item">
+                        <div class="dot" style="background:#00ff00"></div>
+                        <span class="star">★</span>
+                        LOW
+                    </div>
+                    <div class="legend-item">
+                        <div class="dot" style="background:#25FDE9"></div>
+                        <span class="star">★</span>
+                        CHILL
+                    </div>
                 </div>
-                <div class="flex-1"></div>
-                <div class="flex items-center gap-2"><span class="dot" style="background:#ef4444"></span> RESPECTED AS DELETE</div>
+                <div class="legend-item">
+                    <div class="dot" style="background:#ef4444"></div>
+                    RESPECTED AS DELETE
+                </div>
             </div>
         </div>
 
+        <!-- DECK SECTION -->
         <div class="deck-section">
-        <div class="deck-section">
-    <div class="progress-row">
-        <div class="text-gray-500 text-xl tracking-widest">PROGRESS</div>
-        <div class="progress-track">
-            <div id="progress-bar" class="progress-fill"></div>
-        </div>
-    </div>
+            <!-- PROGRESS ROW -->
+            <div class="progress-row">
+                <div class="progress-label">PROGRESS</div>
+                <div class="progress-track">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="progress-counter">[ <span id="progress-counter">0 / 0</span> ]</div>
+            </div>
 
-    <div class="controls-grid relative">
+            <!-- CONTROLS ROW -->
+            <div class="controls-row">
+                <div class="controls-left">
+                    <button class="pixel-btn btn-mode active" data-mode="tag">TAG</button>
+                    <button class="pixel-btn btn-mode" data-mode="split">SPLIT</button>
+                    <button class="pixel-btn btn-mode" data-mode="clear">CLEAR</button>
+                </div>
 
-        <div class="btn-group">
-            <button class="pixel-btn btn-mode active" id="btn-mode-tag" onclick="setMode('tag')">TAG</button>
-            <button class="pixel-btn btn-mode" id="btn-mode-split" onclick="setMode('split')">SPLIT</button>
-            <button class="pixel-btn btn-mode" id="btn-mode-clear" onclick="setMode('clear')">CLEAR</button>
-            <div class="hidden">
-                <input type="radio" name="mode" id="mode-tag" value="tag" checked>
-                <input type="radio" name="mode" id="mode-split" value="split">
-                <input type="radio" name="mode" id="mode-clear" value="clear">
+                <div class="controls-center">
+                    <button class="pixel-btn btn-transport btn-stop" id="stop-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="6" width="12" height="12"/>
+                        </svg>
+                    </button>
+                    <button class="pixel-btn btn-transport btn-play" id="play-btn">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 5v14l11-7z"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="controls-right">
+                    <div class="deck-clock" id="deck-clock">/00:00:00</div>
+                    <button class="pixel-btn btn-load" id="load-btn">LOAD</button>
+                </div>
             </div>
         </div>
-
-        <div class="transport-group">
-            <button class="pixel-btn btn-transport btn-stop" id="cancel-job-btn" title="STOP">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>
-            </button>
-            <button class="pixel-btn btn-transport btn-play" id="start-job-btn" title="PLAY">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-            </button>
-        </div>
-
-        <div class="btn-group">
-            <div class="data-display">
-                <div class="tracker-text text-gray-600">[ <span id="count-display" class="text-cyan-400">0 / 0</span> ]</div>
-                <div class="deck-clock" id="job-timer">/00:00:00</div>
-            </div>
-            <button class="pixel-btn btn-load" onclick="document.getElementById('file-input').click()" title="LOAD DISK">
-                LOAD
-            </button>
-        </div>
-
     </div>
 
-    <div id="status-text" class="absolute bottom-20 left-0 right-0 text-center text-gray-600 pointer-events-none tracking-widest">READY</div>
-</div></div>
+    <!-- FILE INPUT (HIDDEN) -->
+    <input type="file" id="file-input" accept=".xml" style="display: none;">
 
-    </div>
+    <!-- SCRIPT -->
+    <script src="script.js"></script>
 </body>
 </html>
