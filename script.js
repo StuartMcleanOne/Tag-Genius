@@ -336,13 +336,32 @@ function updateProgress(job) {
 
 function handleJobComplete(job) {
     resetState();
-
-    // Show completion
     progressFill.style.width = '100%';
 
-    // Show download panel
-    resultText.textContent = `FILE READY: ${job.output_file_path ? job.output_file_path.split('/').pop() : 'tagged_file.xml'}`;
-    resultPanel.classList.add('visible');
+    // CHECK IF SPLIT JOB
+    if (job.job_type === 'split') {
+        // Parse the array of file paths from result_data
+        try {
+            const filePaths = JSON.parse(job.result_data);
+            if (Array.isArray(filePaths) && filePaths.length > 0) {
+                // Get just the filenames
+                const filenames = filePaths.map(path => path.split('/').pop());
+
+                // Save to localStorage
+                localStorage.setItem('tagamp_workspace', JSON.stringify(filenames));
+
+                // Show message
+                alert(`Split complete! ${filenames.length} files created. Check WORKSPACE view.`);
+            }
+        } catch (e) {
+            console.error('Failed to parse split results:', e);
+        }
+    } else {
+        // NORMAL TAG JOB - show download panel
+        const filename = job.output_file_path ? job.output_file_path.split('/').pop() : 'tagged_file.xml';
+        resultText.textContent = `FILE READY: ${filename}`;
+        resultPanel.classList.add('visible');
+    }
 }
 
 function handleJobFailed(job) {
@@ -468,8 +487,7 @@ async function loadWorkspace() {
     const workspaceList = document.getElementById('workspace-list');
 
     // Check for split files in sessionStorage
-    const splitFiles = sessionStorage.getItem('taggedSplitFiles');
-
+    const splitFiles = localStorage.getItem('tagamp_workspace');
     if (!splitFiles) {
         workspaceList.innerHTML = '<div style="color:#666; text-align:center; padding:20px;">NO SPLIT FILES YET</div>';
         return;
